@@ -1,36 +1,18 @@
 from fastapi import FastAPI
-from cortex.services.vector_db_service import VectorDBService
 from contextlib import asynccontextmanager
-
-app_state = {}
+from cortex.api import events
+from cortex.core.redis import create_redis_pool, close_redis_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("[Startup] Initializing VectorDBService...")
-    app_state["vector_db_service"] = VectorDBService()
-    print("[Startup] VectorDBService initialized.")
+    await create_redis_pool()
     yield
-    print("[Shutdown] Server is shutting down.")
+    await close_redis_pool()
 
-app = FastAPI(
-   title="Cortex Mentor Framework",
-   version="0.1.0",
-   description="The backend server for the agentic framework",
-   lifespan=lifespan
-)
+app = FastAPI(lifespan=lifespan)
+
+app.include_router(events.router, prefix="/api")
 
 @app.get("/")
-def root():
-    vdb = app_state.get("vector_db_service")
-    if vdb is None:
-        return {"status": "VectorDBService not initialized"}
-    try:
-        result = vdb.query("test query")
-    except Exception as e:
-        return {"status": "error", "detail": str(e)}
-    return {"status": "ok", "query_result": result}
-
-@app.get("/health",tags=["Health Check"])
-def health_check_endpoint():
-	"""A simple healthcheck endpoint"""
-	return {"status":"ok","message":"health check passed..."}
+def read_root():
+    return {"message": "Cortex API is running."}

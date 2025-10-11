@@ -21,7 +21,7 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
         return embeddings
 
 
-class VectorDBService:
+class ChromaService:
     def __init__(self):
         settings = Settings()
         self.client = chromadb.PersistentClient(path=settings.chromadb_path)
@@ -30,7 +30,7 @@ class VectorDBService:
             model_name="nomic-embed-text"
         )
         self.collection = self.client.get_or_create_collection(
-            name="knowledge_graph",
+            name="private_user_model",
             embedding_function=OllamaEmbeddingFunction()
         )
        
