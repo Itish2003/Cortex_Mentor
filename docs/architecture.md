@@ -21,7 +21,7 @@ The core components are:
     - **Level 2 (Synthesis)**: Combines insights from both the private user model and the public MCP knowledge base to provide expert advice.
     - **Corpus Curator**: A background agent responsible for populating and maintaining the public MCP knowledge base.
 - **Observers**: A collection of local tools that monitor file changes, Git hooks, and IDE events.
-
+ 
 The following diagram illustrates the Hybrid Knowledge Model architecture:
 
 ```mermaid
