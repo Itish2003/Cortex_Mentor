@@ -42,9 +42,11 @@ class KnowledgeGraphService:
         Creates a markdown representation of an insight with YAML front matter.
         """
         filename = self._generate_insight_filepath(insight)
-        insight_file = self.base_path / "insights" / filename
+        insights_dir = self.base_path / "insights"
+        insight_file = insights_dir / filename
         
         repo_name = insight.metadata.get("repo_name")
+        # The wikilink should be relative to the insights directory now
         parent_repo_node = f"[[../repositories/{repo_name}.md]]" if repo_name else None
 
         frontmatter = {
