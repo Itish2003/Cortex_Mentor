@@ -67,8 +67,11 @@ class KnowledgeGraphService:
         """
         Appends a wikilink to an index/hub node.
         """
-        relative_link_path = os.path.relpath(link_to_add, index_file.parent).replace("\\","/")
-        link_markdown = f"- [[{relative_link_path}]]\n"
+        # Use pathlib for robust, cross-platform relative path generation.
+        relative_link_path = link_to_add.relative_to(index_file.parent)
+        # Convert to a posix-style path (with forward slashes) for the markdown link.
+        link_markdown = f"- [[{relative_link_path.as_posix()}]]\n"
+
         if not index_file.exists():
             with open(index_file, "w", encoding="utf-8") as f:
                 f.write(f"# Index: {index_file.stem}\n\n## Related Insights\n\n{link_markdown}")
