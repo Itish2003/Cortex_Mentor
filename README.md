@@ -16,8 +16,11 @@ Cortex Mentor is an event-driven, agentic framework designed to observe a develo
 - `src/cortex/workers.py`: ARQ worker definitions for background task processing.
 - `src/cortex/api/events.py`: API endpoint for event ingestion.
 - `src/cortex/agents/`: The AI agents responsible for data processing and insight generation.
-- `src/cortex/services/`: Services for interacting with ChromaDB and other external tools.
-- `src/cortex/models/`: Pydantic models defining the structure of events.
+- `src/cortex/services/`: Services for interacting with ChromaDB, Ollama, and the Knowledge Graph.
+- `src/cortex/models/`: Pydantic models for events and insights.
+- `src/cortex/services/knowledge_graph_service.py`: Manages the Zettelkasten-style markdown knowledge graph.
+- `src/cortex/services/llmservice.py`: Service for interacting with local LLMs for summary generation.
+- `src/cortex/models/insights.py`: Pydantic models defining the structure of processed insights.
 - `observers/`: Scripts for observing the developer environment (e.g., Git post-commit hook).
 
 ## Usage
@@ -30,7 +33,7 @@ uv pip install -e .
 ```
 
 ### 2. Run Local Infrastructure
-In three separate terminals, start the required services:
+In separate terminals, start the required services:
 
 **Terminal 1: Start Redis**
 (If you installed with Homebrew and it's not already running)
@@ -38,10 +41,14 @@ In three separate terminals, start the required services:
 brew services start redis
 ```
 
-**Terminal 2: Start Ollama**
-Make sure the Ollama application is running. Then, pull the required embedding model:
+**Terminal 2: Start Ollama & Pull Models**
+Make sure the Ollama application is running. Then, pull the required models:
 ```zsh
+# For embeddings
 ollama pull nomic-embed-text:v1.5
+
+# For summary generation
+ollama pull llava-llama3:latest
 ```
 
 **Terminal 3: Start the ARQ Worker**

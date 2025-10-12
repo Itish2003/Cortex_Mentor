@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Literal
+from typing import Optional, Literal, Union
 from datetime import datetime
 from ..utility.utils import get_utc_now
 
@@ -19,5 +19,7 @@ class GitCommitEvent(BaseModel):
    message: Optional[str] = Field(None, description="The full commit message.")
    author_name: Optional[str] = Field(None, description="The name of the commit author.")
    author_email: Optional[str] = Field(None, description="The email of the commit author.")
-   timestamp: datetime = Field(default_factory=get_utc_now, description="The timestamp of the commit in UTC format.")
+   timestamp: datetime = Field(..., description="The timestamp of the commit in UTC format.")
    diff: Optional[str] = Field(None, description="The diff of the commit")
+
+SourceEvent = Union[CodeChangeEvent, GitCommitEvent]

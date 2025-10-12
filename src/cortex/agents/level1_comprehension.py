@@ -1,88 +1,74 @@
 
-import os
-from cortex.core.config import Settings
-from typing import Dict, Any
+import uuid
 from cortex.models.events import GitCommitEvent, CodeChangeEvent
-from datetime import datetime
-from typing import List, Tuple
+from cortex.models.insights import Insight
+from cortex.services.llmservice import LLMService
 
 class ComprehensionAgent:
     def __init__(self):
-        self.settings = Settings()
-        os.makedirs(self.settings.knowledge_graph_path, exist_ok=True)
+        self.llm_service = LLMService()
 
-    async def process_git_commit_event(self, event_data:GitCommitEvent) -> Dict[str, Any]:
+    async def process_git_commit_event(self, event: GitCommitEvent) -> Insight:
         """
-        Processes a git commit event, appends it to the markdown knowledge graph,
-        and prepares it for ChromaDB indexing.
+        Processes a git commit event, generates an AI summary,
+        and returns a structured Insight object.
         """
-        title = "Git Commit"
-        details = [
-            ("Repo/Branch", f"`{event_data.repo_name}/{event_data.branch_name}`"),
-            ("Author", f"`{event_data.author_name}`"),
-            ("Message", event_data.message.strip() if event_data.message else "No commit message"),
-            ("Commit", f"`{event_data.commit_hash[:7]}`"),
-        ]
+        # 1. Call the LLM service to get a semantic summary
+        summary = self.llm_service.generate_commit_summary(
+            commit_message=event.message or "",
+            commit_diff=event.diff or ""
+        )
 
-        if event_data.stats:
-            stats_str = f"{event_data.stats.get('files_changed', 0)} files changed ({event_data.stats.get(
-      'insertions', 0)} insertions, {event_data.stats.get('deletions', 0)} deletions)."
-            details.append(("Changes", stats_str))
+        # 2. Prepare the content for the vector embedding
+        content_for_embedding = (
+            f"Commit by {event.author_name} to {event.repo_name}/{event.branch_name}. "
+            f"Summary: {summary}. "
+            f"Message: {event.message}"
+        )
 
-        insight = self._generate_insight(title,event_data.timestamp,details)
-        self._append_to_log(insight,"git_log.md")
-        
-        return {
-            "id": event_data.commit_hash,
-            "content":insight,
-            "metadata":{
-                "source":"git_commit",
-                "timestamp": event_data.timestamp.isoformat(),
-                "repo_name": event_data.repo_name,
-                "author": event_data.author_name,
-                "branch": event_data.branch_name
-            }
-        }
+        # 3. Construct the final Insight object
+        insight = Insight(
+            insight_id=f"commit_{uuid.uuid4().hex[:12]}",
+            source_event_type="git_commit",
+            summary=summary,
+            patterns=[], # We can add pattern detection here in the future
+            metadata={
+                "repo_name": event.repo_name,
+                "branch_name": event.branch_name,
+                "commit_hash": event.commit_hash,
+            },
+            content_for_embedding=content_for_embedding,
+            source_event=event
+        )
+        return insight
 
-    async def process_code_change_event(self, event_data: CodeChangeEvent) -> Dict[str, Any]:
+    async def process_code_change_event(self, event: CodeChangeEvent) -> Insight:
         """
-        Processes a code change event, appends it to the markdown knowledge graph,
-        and prepares it for ChromaDB indexing.
+        Processes a code change event, generates an AI summary,
+        and returns a structured Insight object.
         """
-        title = "File Change"
-        details = [
-            ("File", f"`{event_data.file_path}`"),
-            ("Change", f"The file was **{event_data.change_type}**."),
-        ]
+        summary = self.llm_service.generate_code_change_summary(
+            file_path=event.file_path,
+            change_type=event.change_type,
+            content=event.content or ""
+        )
 
-        insight = self._generate_insight(title, event_data.timestamp, details)
-        self._append_to_log(insight, "file_change_log.md")
+        content_for_embedding = (
+            f"File change in {event.file_path}. "
+            f"Type: {event.change_type}. "
+            f"Summary: {summary}."
+        )
 
-        event_id = f"{event_data.file_path}@{event_data.timestamp.isoformat()}"
-
-        return {
-            "id": event_id,
-            "content": insight,
-            "metadata": { "source": "file_change", "timestamp": event_data.timestamp.isoformat(), "file_path":
-      event_data.file_path }
-        }
-
-    def _generate_insight(self, title: str, timestamp: datetime, details: List[Tuple[str, Any]]) -> str:
-            """
-            Generates a standardized, human-readable insight from a title and a list of details.
-            """
-            # Use flexible type casting for detail values
-            details_str = "\n".join(f"- **{key}**: {str(value)}" for key, value in details)
-
-            insight_text = f"""
----
-### {title} on {timestamp.strftime('%Y-%m-%d %H:%M')}
-{details_str}
-"""
-            return insight_text
-
-    def _append_to_log(self, insight: str, filename: str):
-        """Appends the insight to a specified markdown log file."""
-        file_path = os.path.join(self.settings.knowledge_graph_path, filename)
-        with open(file_path, "a", encoding="utf-8") as f:
-            f.write(f"\n{insight}")
+        insight = Insight(
+            insight_id=f"code_{uuid.uuid4().hex[:12]}",
+            source_event_type="file_change",
+            summary=summary,
+            patterns=[],
+            metadata={
+                "file_path": event.file_path,
+                "change_type": event.change_type,
+            },
+            content_for_embedding=content_for_embedding,
+            source_event=event
+        )
+        return insight
