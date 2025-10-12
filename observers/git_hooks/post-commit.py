@@ -80,22 +80,53 @@ def send_event(event: GitCommitEvent, url: str) -> None:
     response.raise_for_status()
 
 def main() -> None:
+
     """
+
     The main orchestrator of the script.
+
     """
+
     try:
-        url = os.getenv("CORTEX_API_URL")
-        if not url:
-            print("[Cortex Observer] Error: CORTEX_API_URL is not set.", file=sys.stderr)
-            return
+
+        # Read the URL from the git config instead of the environment
 
         repo = git.Repo(search_parent_directories=True)
+
+        url = repo.config_reader().get_value("cortex", "api-url")
+
+        
+
+        if not url:
+
+            # Update the error message
+
+            print("[Cortex Observer] Error: Cortex API URL not set in git config.", file=sys.stderr)
+
+            print("[Cortex Observer] Run: git config --local cortex.api-url \"http://127.0.0.1:8000/api/events\"", file=sys.stderr)
+
+            return
+
+
+
         last_commit = repo.head.commit
+
+
+
         event_payload = get_commit_details(last_commit)
+
+
+
         send_event(event_payload, url)
+
+
+
         print("[Cortex Observer] Successfully sent commit event.")
 
+
+
     except Exception as e:
+
         print(f"[Cortex Observer] Error: Failed to send commit event. {e}", file=sys.stderr)
 
 if __name__ == "__main__":

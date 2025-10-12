@@ -5,7 +5,7 @@ from chromadb.api.types import EmbeddingFunction, Embeddings, Embeddable
 import requests
 
 class OllamaEmbeddingFunction(EmbeddingFunction):
-    def __init__(self, model="nomic-embed-text"):
+    def __init__(self, model="nomic-embed-text:v1.5"):
         self.model = model
 
     def __call__(self, texts: Embeddable) -> Embeddings:
