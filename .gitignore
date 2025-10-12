@@ -15,7 +15,6 @@ __pycache__/
 .idea/
 
 # Generated data and logs
-/data/
 /src/data/
 
 # Trash/temporary scripts
