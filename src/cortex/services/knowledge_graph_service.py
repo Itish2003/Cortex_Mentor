@@ -18,7 +18,7 @@ class KnowledgeGraphService:
         (self.base_path / "repositories"
        ).mkdir(parents=True, exist_ok=True)
 
-    def _generate_insight_filepath(self,insight: Insight) -> Path:
+    def _generate_insight_filepath(self,insight: Insight) -> str:
         """
         Generates a unique file path for an insight based on its ID.
         """
@@ -35,15 +35,17 @@ class KnowledgeGraphService:
         else:
             filename = f"insights.generic.{insight.insight_id}.md"
 
-        return self.base_path / filename
+        return filename
 
     def _create_insight_node(self, insight: Insight) -> Path:
         """
         Creates a markdown representation of an insight with YAML front matter.
         """
-        insight_file = self._generate_insight_filepath(insight)
+        filename = self._generate_insight_filepath(insight)
+        insight_file = self.base_path / "insights" / filename
+        
         repo_name = insight.metadata.get("repo_name")
-        parent_repo_node = f"[[repositories/{repo_name}.md]]" if repo_name else None
+        parent_repo_node = f"[[../repositories/{repo_name}.md]]" if repo_name else None
 
         frontmatter = {
             "insight_id": insight.insight_id,
