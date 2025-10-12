@@ -1,6 +1,5 @@
 from cortex.core.config import Settings
 import chromadb
-from chromadb.utils import embedding_functions
 from chromadb.api.types import EmbeddingFunction, Embeddings, Embeddable
 import requests
 
@@ -13,27 +12,24 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
             texts = [texts]
         embeddings = []
         for text in texts:
+            # Use the correct endpoint and payload key for embedding models
             response = requests.post(
-                "http://localhost:11434/api/embeddings",
-                json={"model": self.model, "prompt": text}
+                "http://localhost:11434/api/embed",
+                json={"model": self.model, "input": text}
             )
-            embeddings.append(response.json()["embedding"])
+            response.raise_for_status()
+            # Access the first element of the "embeddings" list
+            embeddings.append(response.json()["embeddings"][0])
         return embeddings
-
 
 class ChromaService:
     def __init__(self):
         settings = Settings()
         self.client = chromadb.PersistentClient(path=settings.chromadb_path)
-        self.embedding_fn = embedding_functions.OllamaEmbeddingFunction(
-            url="http://localhost:11434/api/embeddings",
-            model_name="nomic-embed-text"
-        )
         self.collection = self.client.get_or_create_collection(
             name="private_user_model",
             embedding_function=OllamaEmbeddingFunction()
         )
-       
 
     def add_document(self, doc_id: str, content: str, metadata: dict):
         """Add a document to the ChromaDB collection."""
