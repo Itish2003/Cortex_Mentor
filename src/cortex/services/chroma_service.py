@@ -8,6 +8,7 @@ class OllamaEmbeddingFunction(EmbeddingFunction):
         self.model = model
 
     def __call__(self, texts: Embeddable) -> Embeddings:
+        print("--- OLLAMA EMBEDDING FUNCTION CALLED ---")
         if isinstance(texts, str):
             texts = [texts]
         embeddings = []
