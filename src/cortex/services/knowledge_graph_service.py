@@ -18,35 +18,38 @@ class KnowledgeGraphService:
         (self.base_path / "repositories"
        ).mkdir(parents=True, exist_ok=True)
 
-    def _generate_insight_filepath(self,insight: Insight) -> str:
+    def _generate_insight_filepath(self, insight: Insight) -> str:
         """
-        Generates a unique file path for an insight based on its ID.
+        Generates a unique file name for an insight based on its ID.
         """
-        event_type_slug = insight.source_event_type.replace(" ", "_").lower()
+        event_type_slug = insight.source_event_type.replace("_", ".").lower()
         if isinstance(insight.source_event, GitCommitEvent):
             short_hash = insight.source_event.commit_hash[:12]
-            filename = f"insights.{event_type_slug}.{short_hash}.md"
+            filename = f"{event_type_slug}.{short_hash}.md"
 
         elif isinstance(insight.source_event, CodeChangeEvent):
             path_hash = hashlib.md5(insight.source_event.file_path.encode()).hexdigest()[:12]
             timestamp = insight.timestamp.strftime("%Y%m%dT%H%M%S")
-            filename = f"insights.{event_type_slug}.{path_hash}.{timestamp}.md"
+            filename = f"{event_type_slug}.{path_hash}.{timestamp}.md"
 
         else:
-            filename = f"insights.generic.{insight.insight_id}.md"
+            filename = f"generic.{insight.insight_id}.md"
 
-        return filename
+        return filename.replace("/", "_")
 
     def _create_insight_node(self, insight: Insight) -> Path:
         """
         Creates a markdown representation of an insight with YAML front matter.
         """
-        filename = self._generate_insight_filepath(insight)
+        core_filename = self._generate_insight_filepath(insight)
+        # Construct the filename with the desired prefix
+        final_filename = f"insights.{core_filename}"
+
+        # Construct the final path
         insights_dir = self.base_path / "insights"
-        insight_file = insights_dir / filename
+        insight_file = insights_dir / final_filename
         
         repo_name = insight.metadata.get("repo_name")
-        # The wikilink should be relative to the insights directory now
         parent_repo_node = f"[[../repositories/{repo_name}.md]]" if repo_name else None
 
         frontmatter = {
