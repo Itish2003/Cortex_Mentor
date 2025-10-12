@@ -10,10 +10,16 @@ class OllamaEmbeddingHelper:
 
     def get_embedding(self, text: str) -> List[float]:
         """Generates a single embedding for a single piece of text."""
+        print(f"--- OLLAMA HELPER: Sending request for text: '{text[:50]}...' ")
         response = requests.post(
             "http://localhost:11434/api/embed",
             json={"model": self.model, "input": text}
         )
+        
+        print(f"--- OLLAMA RESPONSE --- STATUS CODE: {response.status_code} ---")
+        print(f"--- HEADERS: {response.headers} ---")
+        print(f"--- RAW TEXT: {response.text} ---")
+
         response.raise_for_status()
         return response.json()["embeddings"][0]
 
