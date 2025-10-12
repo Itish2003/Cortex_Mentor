@@ -14,11 +14,9 @@ __pycache__/
 .vscode/
 .idea/
 
-# Data directory
+# Generated data and logs
 /data/
+/src/data/
 
 # Trash/temporary scripts
-scripts/.trash_*
-
-# ChromaDB database
-src/cortex/data/knowledge_graph/vector_db/chroma.sqlite3
+/scripts/.trash*
