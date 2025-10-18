@@ -5,7 +5,7 @@ Cortex Mentor is an event-driven, agentic framework designed to observe a develo
 ## Features
 - **Event-Driven Architecture**: Ingests events from various observers (Git hooks, file watchers, etc.) via a FastAPI gateway.
 - **Asynchronous Task Processing**: Uses ARQ and Redis to manage a robust background task queue for processing events without blocking.
-- **AI Agent Fleet**: A multi-level agent system (`ComprehensionAgent`, `SynthesisAgent`, etc.) processes raw data into structured insights.
+- **AI Agent Fleet**: A multi-level agent system (`SynthesisAgent`, etc.) processes raw data into structured insights.
 - **Hybrid Knowledge Store**: 
     - **Markdown Zettelkasten**: Human-readable logs of all insights are stored in local markdown files.
     - **Vector Search Index**: ChromaDB and local Ollama embeddings power a searchable index over the knowledge graph for fast, semantic retrieval.

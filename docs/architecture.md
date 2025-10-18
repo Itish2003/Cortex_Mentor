@@ -141,7 +141,6 @@ The application's code is organized into a modular structure within the `src/cor
     - `upstash_service.py`: Manages all interactions with the Upstash Vector DB, handling the public MCP Knowledge Base.
 
 - **`agents/`**: Contains the AI agents that perform the core logic of the application.
-    - `level1_comprehension.py`: The Level 1 agent processes raw events, generates human-readable insights, and performs the dual-write to the Markdown Knowledge Graph and the ChromaDB index.
     - `level2_synthesis.py`: The Level 2 agent queries both the private and public knowledge stores to synthesize higher-level insights and form expert opinions.
     - `level3_curation/corpus_curator.py`: The Corpus Curator agent is responsible for curating and populating the public MCP Knowledge Base in the background.
 
