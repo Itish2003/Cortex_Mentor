@@ -60,3 +60,4 @@ async def synthesis_task(ctx, query_text: str):
 class WorkerSettings:
     functions = [process_event_task, curate_corpus_task, synthesis_task]
     queues = ['high_priority', 'low_priority']
+  
