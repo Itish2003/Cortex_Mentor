@@ -1,15 +1,19 @@
 
+import os
 from upstash_vector import Index
-from cortex.core.config import Settings
 
 class UpstashService:
     def __init__(self):
-        settings = Settings()
+        # Bypass pydantic-settings and load directly from the environment
+        url = os.getenv("UPSTASH_URL", "")
+        token = os.getenv("UPSTASH_TOKEN", "")
+
         print(f"--- Initializing UpstashService ---")
-        print(f"URL: '{settings.upstash_url}'")
-        print(f"Token starts with: '{settings.upstash_token[:5]}...'")
+        print(f"URL from os.getenv: '{url}'")
+        print(f"Token from os.getenv starts with: '{token[:5]}...'")
         print(f"---------------------------------")
-        self.index = Index(url=settings.upstash_url, token=settings.upstash_token)
+
+        self.index = Index(url=url, token=token)
 
     def add_document(self, doc_id: str, content: str, metadata: dict):
         """Add a document to the Upstash collection."""
