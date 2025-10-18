@@ -145,22 +145,57 @@ The application's code is organized into a modular structure within the `src/cor
     - `level2_synthesis.py`: The Level 2 agent queries both the private and public knowledge stores to synthesize higher-level insights and form expert opinions.
     - `level3_curation/corpus_curator.py`: The Corpus Curator agent is responsible for curating and populating the public MCP Knowledge Base in the background.
 
-## 4. Data Flow
+## 6. Refactoring to a Pipeline & Processor Model
 
-The following steps outline the lifecycle of an event within the Cortex Mentor application:
+To create a more modular, scalable, and testable system, the current agent-based logic will be refactored into a formal **Pipeline & Processor** architecture. In this model, a "Pipeline" is responsible for executing a series of self-contained, reusable "Processors," with each processor handling one specific unit of work.
 
-1.  **Event Ingestion**: An observer (e.g., an IDE plugin or Git hook) sends a raw event to the FastAPI API Gateway.
+This approach decouples the logic, allowing for flexible composition of workflows and easier maintenance. The ARQ task will be simplified to just defining and executing the appropriate pipeline.
 
-2.  **Task Queuing**: The API gateway validates the event and enqueues it as a job in the `high_priority` ARQ task queue.
+```mermaid
+graph TD
+    subgraph ARQ_WORKER [ARQ Worker]
+        A["Start: Raw Event Dictionary"]
+        B(Define & Execute Pipeline)
+    end
 
-3.  **Level 1 Comprehension**: An ARQ worker picks up the job and dispatches it to the **Level 1 Comprehension Agent**.
+    subgraph PIPELINE [Comprehension Pipeline]
+        direction LR
+        P1[EventDeserializer]
+        P2[InsightGenerator]
+        P3[KnowledgeGraphWriter]
+        P4[ChromaWriter]
+        P5[SynthesisTrigger]
+    end
 
-4.  **Dual-Write to Private Model**: The L1 Agent processes the event and performs two actions:
-    a.  It appends a human-readable insight to the appropriate Markdown file in the `data/knowledge_graph/` directory (the source of truth).
-    b.  It simultaneously updates the local ChromaDB instance with the vector embedding of the insight, including a metadata pointer back to the source Markdown file.
+    subgraph DATA [Data Object]
+        direction TB
+        D1["event_data (dict)"]
+        D2["GitCommitEvent (Pydantic Model)"]
+        D3["Insight (Pydantic Model)"]
+    end
 
-5.  **Level 2 Synthesis (Optional)**: After processing, the L1 Agent can enqueue a follow-up job for the **Level 2 Synthesis Agent** if a deeper analysis is required.
+    %% Pipeline Flow
+    A --> B
+    B -- data --> P1
+    P1 -- transforms --> D2
+    D2 --> P2
+    P2 -- transforms --> D3
+    D3 --> P3
+    P3 -- passes through --> P4
+    P4 -- passes through --> P5
+    P5 -- enqueues job --> ARQ_WORKER
 
-6.  **Insight Synthesis**: The L2 Agent queries both the private user model (ChromaDB) and the public MCP knowledge base (Upstash) to form a holistic understanding and generate expert advice.
+    %% Style
+    style PIPELINE fill:#E8DAEF,stroke:#8E44AD
+```
 
-7.  **Corpus Curation (Parallel)**: Independently, the **Corpus Curator Agent** runs as a background task on a `low_priority` queue, curating and populating the Upstash MCP with high-quality data.
+### Flow Description:
+
+1.  **Execution**: An ARQ task receives the raw event data and constructs a `Pipeline` composed of specific processors.
+2.  **Processing**: The pipeline executes the processors in sequence:
+    *   `EventDeserializer`: Parses the raw dictionary into a validated Pydantic `Event` model.
+    *   `InsightGenerator`: Takes the `Event` model, calls the `LLMService`, and produces a structured `Insight` object.
+    *   `KnowledgeGraphWriter`: Appends the human-readable insight to the Markdown knowledge graph.
+    *   `ChromaWriter`: Adds the machine-readable embedding to the ChromaDB index.
+    *   `SynthesisTrigger`: Enqueues a new job for the next pipeline (e.g., the Synthesis Pipeline).
+3.  **Data Flow**: The output of each processor becomes the input for the next, allowing data to be progressively enriched and transformed as it moves through the pipeline.

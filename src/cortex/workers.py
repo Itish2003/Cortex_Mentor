@@ -5,6 +5,8 @@ from cortex.services.knowledge_graph_service import KnowledgeGraphService
 from cortex.models.events import GitCommitEvent, CodeChangeEvent
 from cortex.models.insights import Insight
 import logging
+from cortex.core.redis import get_redis
+from cortex.agents.level2_synthesis import SynthesisAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -39,6 +41,10 @@ async def process_event_task(ctx, event_data:dict):
             metadata=insight.metadata
         )
 
+        redis = get_redis()
+        await redis.enqueue_job('synthesis_task', insight.content_for_embedding)
+        logger.info(f"Enqueued synthesis task for insight {insight.insight_id}")
+
 async def curate_corpus_task(ctx, data):
     """
 
@@ -47,6 +53,14 @@ async def curate_corpus_task(ctx, data):
     agent = CorpusCuratorAgent()
     await agent.curate_and_save(data)
 
+async def synthesis_task(ctx, query_text: str):
+    """
+    ARQ task to perform synthesis on the given query text.
+    """
+    logger.info(f"Synthesizing information for query: {query_text[:50]}...")
+    agent = SynthesisAgent()
+    await agent.synthesize_insights(query_text)
+
 class WorkerSettings:
-    functions = [process_event_task, curate_corpus_task]
+    functions = [process_event_task, curate_corpus_task, synthesis_task]
     queues = ['high_priority', 'low_priority']
