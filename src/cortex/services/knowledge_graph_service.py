@@ -68,8 +68,9 @@ class KnowledgeGraphService:
         """
         Appends a wikilink to an index/hub node.
         """
-        # Use pathlib for robust, cross-platform relative path generation.
-        relative_link_path = link_to_add.relative_to(index_file.parent)
+        # Use os.path.relpath for a more robust relative path calculation
+        # that works even when files are in sibling directories.
+        relative_link_path = os.path.relpath(link_to_add, start=index_file.parent)
         # Convert to a posix-style path (with forward slashes) for the markdown link.
         link_markdown = f"- [[{relative_link_path.as_posix()}]]\n"
 
