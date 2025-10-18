@@ -42,8 +42,8 @@ class KnowledgeGraphService:
         Creates a markdown representation of an insight with YAML front matter.
         """
         filename = self._generate_insight_filepath(insight)
-        # Hardcode the path to ensure correctness.
-        insight_file = Path(f"src/data/knowledge_graph/insights/{filename}")
+        # Use the base_path to construct the full, absolute path.
+        insight_file = self.base_path / "insights" / filename
         
         repo_name = insight.metadata.get("repo_name")
         parent_repo_node = f"[[../repositories/{repo_name}.md]]" if repo_name else None
