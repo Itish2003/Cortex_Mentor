@@ -20,7 +20,7 @@ class SynthesisAgent:
         logger.info("Querying private knowledge store (ChromaDB)...")
         private_results = self.chroma_service.query(query_text,n_results=2)
         logger.info("Querying public knowledge store (Upstash)...")
-        public_results = self.upstash_service.query(query_text,n_results=2)
+        public_results = await self.upstash_service.query(query_text,n_results=2)
 
         # In a real implementation, this method would involve
         # a more sophisticated merging and ranking of the results.

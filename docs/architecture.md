@@ -145,9 +145,9 @@ The application's code is organized into a modular structure within the `src/cor
     - `level2_synthesis.py`: The Level 2 agent queries both the private and public knowledge stores to synthesize higher-level insights and form expert opinions.
     - `level3_curation/corpus_curator.py`: The Corpus Curator agent is responsible for curating and populating the public MCP Knowledge Base in the background.
 
-## 7. Current Implemented Flow
+## 7. Current Operational Flow (Pipeline-based L1)
 
-This diagram shows the architecture that has been successfully implemented and tested so far. It follows an agent-centric model where ARQ tasks delegate work to specific, monolithic agent classes.
+This diagram shows the architecture that has been successfully implemented and tested. The Level 1 Comprehension is now handled by a modular Pipeline & Processor model, which processes raw events, persists insights, and triggers the Level 2 Synthesis.
 
 ```mermaid
 graph TD
@@ -158,7 +158,7 @@ graph TD
     subgraph "Cortex Backend"
         B(FastAPI Gateway)
         C(ARQ Task Queue)
-        D[L1 Comprehension Agent]
+        P[Comprehension Pipeline]
         E[L2 Synthesis Agent]
     end
 
@@ -170,10 +170,10 @@ graph TD
 
     A -- Raw Event --> B
     B -- Enqueues L1 Job --> C
-    C -- Dispatches --> D
-    D -- Writes to --> F
-    D -- Writes to --> H
-    D -- Enqueues L2 Job --> C
+    C -- Dispatches --> P
+    P -- Writes to --> F
+    P -- Writes to --> H
+    P -- Triggers L2 Job --> C
     C -- Dispatches --> E
     E -- Queries --> F
     E -- Queries --> G
@@ -181,9 +181,9 @@ graph TD
 
 ## 6. Refactoring to a Pipeline & Processor Model
 
-To create a more modular, scalable, and testable system, the current agent-based logic will be refactored into a formal **Pipeline & Processor** architecture. In this model, a "Pipeline" is responsible for executing a series of self-contained, reusable "Processors," with each processor handling one specific unit of work.
+To create a more modular, scalable, and testable system, the current agent-based logic has been refactored into a formal **Pipeline & Processor** architecture. In this model, a "Pipeline" is responsible for executing a series of self-contained, reusable "Processors," with each processor handling one specific unit of work.
 
-This new diagram provides a clearer blueprint for implementation, showing a `Pipeline` object that composes and executes a series of `Processor` objects.
+This diagram provides the blueprint for the implemented Level 1 Comprehension Pipeline, showing a `Pipeline` object that composes and executes a series of `Processor` objects.
 
 ```mermaid
 graph TD
