@@ -5,6 +5,10 @@ from cortex.core.config import Settings
 class UpstashService:
     def __init__(self):
         settings = Settings()
+        print(f"--- Initializing UpstashService ---")
+        print(f"URL: '{settings.upstash_url}'")
+        print(f"Token starts with: '{settings.upstash_token[:5]}...'")
+        print(f"---------------------------------")
         self.index = Index(url=settings.upstash_url, token=settings.upstash_token)
 
     def add_document(self, doc_id: str, content: str, metadata: dict):
