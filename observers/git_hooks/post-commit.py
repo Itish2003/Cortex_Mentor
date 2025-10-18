@@ -2,6 +2,14 @@
 
 import sys
 import os
+
+# This ensures the script can find the 'cortex' module
+# by adding the project's 'src' directory to the Python path.
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+src_path = os.path.join(project_root, 'src')
+if src_path not in sys.path:
+    sys.path.insert(0, src_path)
+
 import requests
 import git
 from datetime import datetime, timezone
@@ -93,7 +101,12 @@ def main() -> None:
 
         repo = git.Repo(search_parent_directories=True)
 
-        url = repo.config_reader().get_value("cortex", "api-url")
+        # 1. Get the raw value from the config. It could be any type.
+        raw_url = repo.config_reader().get_value("cortex", "api-url")
+
+        # 2. Explicitly convert the raw value to a string, or None if it's missing.
+        #    This guarantees the type for the rest of the function.
+        url = str(raw_url) if raw_url else None
 
         
 

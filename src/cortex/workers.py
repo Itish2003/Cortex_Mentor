@@ -1,49 +1,45 @@
-from cortex.agents.level1_comprehension import ComprehensionAgent
 from cortex.agents.level3_curation.corpus_curator import CorpusCuratorAgent
-from cortex.services.chroma_service import ChromaService
-from cortex.services.knowledge_graph_service import KnowledgeGraphService
-from cortex.models.events import GitCommitEvent, CodeChangeEvent
 from cortex.models.insights import Insight
 import logging
 from cortex.core.redis import get_redis
 from cortex.agents.level2_synthesis import SynthesisAgent
+from cortex.pipelines.pipelines import Pipeline
+from cortex.pipelines.comprehension import (
+    EventDeserializer,
+    InsightGenerator,
+    KnowledgeGraphWriter,
+    ChromaWriter,
+    SynthesisTrigger
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def process_event_task(ctx, event_data:dict):
+async def process_event_task(ctx, event_data: dict):
     """
-    ARQ task to process an event.
+    ARQ task to process a raw event using the new pipeline architecture.
     """
-    agent = ComprehensionAgent()
-    insight: Insight | None = None
+    logger.info(f"--- Starting Comprehension Pipeline for Event ---")
 
-    event_type = event_data.get("event_type")
-    if event_type == "git_commit":
-        event = GitCommitEvent(**event_data)
-        insight = await agent.process_git_commit_event(event)
-    elif event_type == "file_change":
-        event = CodeChangeEvent(**event_data)
-        insight = await agent.process_code_change_event(event)
-    else:
-        logger.info(f"Unknown event type: {event_type}")
+    comprehension_pipeline = Pipeline([
+        EventDeserializer(),
+        InsightGenerator(),
+        KnowledgeGraphWriter(),
+        ChromaWriter(),
+        SynthesisTrigger(),
+    ])
 
-    if insight:
-        # 1. Persist to the human-readable knowledge graph
-        kg_service = KnowledgeGraphService()
-        kg_service.process_insight(insight)
+    context = {}
 
-        # 2. Persist to the machine-readable vector DB
-        chroma_service = ChromaService()
-        chroma_service.add_document(
-            doc_id=insight.insight_id,
-            content=insight.content_for_embedding,
-            metadata=insight.metadata
+    try:
+        await comprehension_pipeline.execute(
+            data=event_data,
+            context=context
         )
+        logger.info(f"--- Comprehension Pipeline Finished Successfully ---")
+    except Exception as e:
+        logger.error(f"Comprehension pipeline failed: {e}", exc_info=True)
 
-        redis = get_redis()
-        await redis.enqueue_job('synthesis_task', insight.content_for_embedding)
-        logger.info(f"Enqueued synthesis task for insight {insight.insight_id}")
 
 async def curate_corpus_task(ctx, data):
     """

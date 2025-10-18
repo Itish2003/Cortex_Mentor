@@ -145,48 +145,80 @@ The application's code is organized into a modular structure within the `src/cor
     - `level2_synthesis.py`: The Level 2 agent queries both the private and public knowledge stores to synthesize higher-level insights and form expert opinions.
     - `level3_curation/corpus_curator.py`: The Corpus Curator agent is responsible for curating and populating the public MCP Knowledge Base in the background.
 
+## 7. Current Implemented Flow
+
+This diagram shows the architecture that has been successfully implemented and tested so far. It follows an agent-centric model where ARQ tasks delegate work to specific, monolithic agent classes.
+
+```mermaid
+graph TD
+    subgraph "Git Observer"
+        A[git commit]
+    end
+
+    subgraph "Cortex Backend"
+        B(FastAPI Gateway)
+        C(ARQ Task Queue)
+        D[L1 Comprehension Agent]
+        E[L2 Synthesis Agent]
+    end
+
+    subgraph "Data Stores"
+        F[ChromaDB]
+        G[Upstash]
+        H[Markdown KG]
+    end
+
+    A -- Raw Event --> B
+    B -- Enqueues L1 Job --> C
+    C -- Dispatches --> D
+    D -- Writes to --> F
+    D -- Writes to --> H
+    D -- Enqueues L2 Job --> C
+    C -- Dispatches --> E
+    E -- Queries --> F
+    E -- Queries --> G
+```
+
 ## 6. Refactoring to a Pipeline & Processor Model
 
 To create a more modular, scalable, and testable system, the current agent-based logic will be refactored into a formal **Pipeline & Processor** architecture. In this model, a "Pipeline" is responsible for executing a series of self-contained, reusable "Processors," with each processor handling one specific unit of work.
 
-This approach decouples the logic, allowing for flexible composition of workflows and easier maintenance. The ARQ task will be simplified to just defining and executing the appropriate pipeline.
+This new diagram provides a clearer blueprint for implementation, showing a `Pipeline` object that composes and executes a series of `Processor` objects.
 
 ```mermaid
 graph TD
-    subgraph ARQ_WORKER [ARQ Worker]
-        A["Start: Raw Event Dictionary"]
-        B(Define & Execute Pipeline)
+    subgraph "ARQ Worker"
+        A["Start: Raw Event Data"]
+        B(Build & Execute Pipeline)
     end
 
-    subgraph PIPELINE [Comprehension Pipeline]
+    subgraph "Pipeline Execution"
         direction LR
-        P1[EventDeserializer]
-        P2[InsightGenerator]
-        P3[KnowledgeGraphWriter]
-        P4[ChromaWriter]
-        P5[SynthesisTrigger]
+        C(Pipeline) -- contains --> P1[P1: EventDeserializer]
+        C -- contains --> P2[P2: InsightGenerator]
+        C -- contains --> P3[P3: KnowledgeGraphWriter]
+        C -- contains --> P4[P4: ChromaWriter]
+        C -- contains --> P5[P5: SynthesisTrigger]
     end
 
-    subgraph DATA [Data Object]
-        direction TB
-        D1["event_data (dict)"]
-        D2["GitCommitEvent (Pydantic Model)"]
-        D3["Insight (Pydantic Model)"]
+    %% Data Transformation Flow
+    subgraph "Data Lifecycle"
+        direction LR
+        D1[Dict] --> D2[Event Model] --> D3[Insight Model]
     end
 
-    %% Pipeline Flow
+    %% Link Execution to Data
     A --> B
-    B -- data --> P1
-    P1 -- transforms --> D2
-    D2 --> P2
-    P2 -- transforms --> D3
-    D3 --> P3
-    P3 -- passes through --> P4
-    P4 -- passes through --> P5
-    P5 -- enqueues job --> ARQ_WORKER
+    B -- Executes --> C
 
-    %% Style
-    style PIPELINE fill:#E8DAEF,stroke:#8E44AD
+    subgraph "Processor Sequence"
+        direction LR
+        B -- "initial_data(D1)" --> P1
+        P1 -- "output(D2)" --> P2
+        P2 -- "output(D3)" --> P3
+        P3 -- "output(D3)" --> P4
+        P4 -- "output(D3)" --> P5
+    end
 ```
 
 ### Flow Description:
