@@ -17,4 +17,4 @@ class CorpusCuratorAgent:
         metadata = data.get("metadata", {})
 
         if doc_id and content:
-            self.upstash_service.add_document(doc_id, content, metadata)
+            await self.upstash_service.add_document(doc_id, content, metadata)
