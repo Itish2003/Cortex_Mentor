@@ -15,4 +15,5 @@ class Settings(BaseSettings):
         env_prefix = "CORTEX_"
         env_file = ".env"
         extra = "ignore"   
+         
         
