@@ -71,8 +71,8 @@ class KnowledgeGraphService:
         # Use os.path.relpath for a more robust relative path calculation
         # that works even when files are in sibling directories.
         relative_link_path = os.path.relpath(link_to_add, start=index_file.parent)
-        # Convert to a posix-style path (with forward slashes) for the markdown link.
-        link_markdown = f"- [[{relative_link_path.as_posix()}]]\n"
+        # os.path.relpath returns a string. We need to ensure it uses forward slashes for the markdown link.
+        link_markdown = f"- [[{relative_link_path.replace(os.sep, '/')}]]\n"
 
         if not index_file.exists():
             with open(index_file, "w", encoding="utf-8") as f:
