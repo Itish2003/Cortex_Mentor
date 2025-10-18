@@ -1,19 +1,13 @@
 import redis.asyncio as redis
 from arq import create_pool
-from arq.connections import RedisSettings
-from arq import ArqRedis
+from arq.connections import RedisSettings, ArqRedis
 
-redis_pool: ArqRedis | None = None
+async def create_redis_pool() -> ArqRedis:
+    """Creates and returns a new ARQ Redis pool."""
+    return await create_pool(RedisSettings())
 
-async def create_redis_pool():
-    global redis_pool
-    redis_pool = await create_pool(RedisSettings())
-
-async def close_redis_pool():
-    if redis_pool:
-        await redis_pool.close()
-
-def get_redis():
-    assert redis_pool is not None, "Redis pool is not initialized. Call create_redis_pool() first."
-    return redis_pool
+async def close_redis_pool(pool: ArqRedis | None):
+    """Closes the given Redis pool if it exists."""
+    if pool:
+        await pool.close()
     

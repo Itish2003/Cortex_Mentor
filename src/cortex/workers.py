@@ -1,7 +1,7 @@
 from cortex.agents.level3_curation.corpus_curator import CorpusCuratorAgent
 from cortex.models.insights import Insight
 import logging
-from cortex.core.redis import get_redis
+from cortex.core.redis import create_redis_pool, close_redis_pool
 from cortex.agents.level2_synthesis import SynthesisAgent
 from cortex.pipelines.pipelines import Pipeline
 from cortex.pipelines.comprehension import (
@@ -11,7 +11,8 @@ from cortex.pipelines.comprehension import (
     ChromaWriter,
     SynthesisTrigger
 )
-
+from cortex.services.knowledge_graph_service import KnowledgeGraphService
+from cortex.services.chroma_service import ChromaService
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -21,15 +22,23 @@ async def process_event_task(ctx, event_data: dict):
     """
     logger.info(f"--- Starting Comprehension Pipeline for Event ---")
 
+    # 1. Instantiate services that the processors will need.
+    kg_service = KnowledgeGraphService()
+    chroma_service = ChromaService()
+
+    # 2. Define the pipeline by injecting dependencies into the processors.
     comprehension_pipeline = Pipeline([
         EventDeserializer(),
         InsightGenerator(),
-        KnowledgeGraphWriter(),
-        ChromaWriter(),
+        KnowledgeGraphWriter(kg_service),
+        ChromaWriter(chroma_service),
         SynthesisTrigger(),
     ])
 
-    context = {}
+    # 3. The context now only holds run-specific objects like the redis pool.
+    context = {
+        "redis": ctx.get("redis")
+    }
 
     try:
         await comprehension_pipeline.execute(
@@ -37,9 +46,22 @@ async def process_event_task(ctx, event_data: dict):
             context=context
         )
         logger.info(f"--- Comprehension Pipeline Finished Successfully ---")
+
     except Exception as e:
         logger.error(f"Comprehension pipeline failed: {e}", exc_info=True)
 
+
+async def on_startup(ctx):
+    """
+    Creates the redis pool on worker startup and stores it in the context.
+    """
+    ctx["redis"] = await create_redis_pool()
+
+async def on_shutdown(ctx):
+    """
+    Closes the redis pool on worker shutdown.
+    """
+    await close_redis_pool(ctx.get("redis"))
 
 async def curate_corpus_task(ctx, data):
     """
@@ -60,4 +82,6 @@ async def synthesis_task(ctx, query_text: str):
 class WorkerSettings:
     functions = [process_event_task, curate_corpus_task, synthesis_task]
     queues = ['high_priority', 'low_priority']
+    on_startup = on_startup
+    on_shutdown = on_shutdown
   

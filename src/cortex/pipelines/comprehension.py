@@ -6,7 +6,6 @@ from cortex.services.llmservice import LLMService
 from cortex.services.knowledge_graph_service import KnowledgeGraphService
 from cortex.services.chroma_service import ChromaService
 import logging
-from cortex.core.redis import get_redis
 from uuid import uuid4
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -109,8 +108,8 @@ class KnowledgeGraphWriter(Processor):
     """
     Processor to write Insights to the knowledge graph.
     """
-    def __init__(self):
-        self.kg_service = KnowledgeGraphService()
+    def __init__(self, kg_service: KnowledgeGraphService):
+        self.kg_service = kg_service
 
     async def process(self, data: Insight, context: dict) -> Insight:
         logger.info(f"Writing insight {data.insight_id} to knowledge graph.")
@@ -122,8 +121,8 @@ class ChromaWriter(Processor):
     """
     Processor to write Insights to the Chroma vector database.
     """
-    def __init__(self):
-        self.chroma_service = ChromaService()
+    def __init__(self, chroma_service: ChromaService):
+        self.chroma_service = chroma_service
 
     async def process(self, data: Insight, context: dict) -> Insight:
         logger.info(f"Adding insight {data.insight_id} to ChromaDB.")
@@ -141,9 +140,11 @@ class SynthesisTrigger(Processor):
     """
     async def process(self, data: Insight, context: dict) -> Insight:
         logger.info(f"Triggering synthesis task for insight {data.insight_id}.")
-        if data:
-            logger.info(f"Synthesis task would be enqueued here for insight {data.insight_id}.")
-            redis = get_redis()
+        redis = context.get("redis")
+        if data and redis:
+            logger.info(f"Enqueuing synthesis task for insight {data.insight_id}.")
             await redis.enqueue_job('synthesis_task', data.content_for_embedding)
+        elif not redis:
+            logger.error("Redis pool not found in context for SynthesisTrigger.")
         logger.info(f"Synthesis task triggered for insight {data.insight_id}.")
         return data

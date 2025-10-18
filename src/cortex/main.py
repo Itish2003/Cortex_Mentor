@@ -5,9 +5,10 @@ from cortex.core.redis import create_redis_pool, close_redis_pool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await create_redis_pool()
+    pool = await create_redis_pool()
+    app.state.redis = pool
     yield
-    await close_redis_pool()
+    await close_redis_pool(app.state.redis)
 
 app = FastAPI(lifespan=lifespan)
 
