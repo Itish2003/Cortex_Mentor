@@ -10,4 +10,5 @@ async def close_redis_pool(pool: ArqRedis | None):
     """Closes the given Redis pool if it exists."""
     if pool:
         await pool.close()
-    
+     
+     
