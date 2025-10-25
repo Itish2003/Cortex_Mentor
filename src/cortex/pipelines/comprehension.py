@@ -111,11 +111,11 @@ class KnowledgeGraphWriter(Processor):
     def __init__(self, kg_service: KnowledgeGraphService):
         self.kg_service = kg_service
 
-    async def process(self, data: Insight, context: dict) -> Insight:
+    async def process(self, data: Insight, context: dict) -> None:
         logger.info(f"Writing insight {data.insight_id} to knowledge graph.")
         self.kg_service.process_insight(data)
         logger.info(f"Insight {data.insight_id} written to knowledge graph.")
-        return data
+        return None
     
 class ChromaWriter(Processor):
     """
@@ -124,7 +124,7 @@ class ChromaWriter(Processor):
     def __init__(self, chroma_service: ChromaService):
         self.chroma_service = chroma_service
 
-    async def process(self, data: Insight, context: dict) -> Insight:
+    async def process(self, data: Insight, context: dict) -> None:
         logger.info(f"Adding insight {data.insight_id} to ChromaDB.")
         self.chroma_service.add_document(
             doc_id=data.insight_id,
@@ -132,13 +132,13 @@ class ChromaWriter(Processor):
             metadata=data.metadata
         )
         logger.info(f"Insight {data.insight_id} added to ChromaDB.")
-        return data
-    
+        return None
+
 class SynthesisTrigger(Processor):
     """
     Processor to trigger synthesis tasks based on the generated Insight.
     """
-    async def process(self, data: Insight, context: dict) -> Insight:
+    async def process(self, data: Insight, context: dict) -> None:
         logger.info(f"Triggering synthesis task for insight {data.insight_id}.")
         redis = context.get("redis")
         if data and redis:
@@ -147,4 +147,4 @@ class SynthesisTrigger(Processor):
         elif not redis:
             logger.error("Redis pool not found in context for SynthesisTrigger.")
         logger.info(f"Synthesis task triggered for insight {data.insight_id}.")
-        return data
+        return None

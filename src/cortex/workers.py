@@ -2,7 +2,6 @@ from cortex.agents.level3_curation.corpus_curator import CorpusCuratorAgent
 from cortex.models.insights import Insight
 import logging
 from cortex.core.redis import create_redis_pool, close_redis_pool
-from cortex.agents.level2_synthesis import SynthesisAgent
 from cortex.pipelines.pipelines import Pipeline
 from cortex.pipelines.comprehension import (
     EventDeserializer,
@@ -11,8 +10,15 @@ from cortex.pipelines.comprehension import (
     ChromaWriter,
     SynthesisTrigger
 )
+from cortex.pipelines.synthesis import create_synthesis_pipeline
 from cortex.services.knowledge_graph_service import KnowledgeGraphService
 from cortex.services.chroma_service import ChromaService
+from cortex.services.upstash_service import UpstashService
+from cortex.core.config import Settings
+from cortex.pipelines.graph_traversal import GraphTraversalProcessor
+from cortex.services.llmservice import LLMService
+from google.adk.tools import google_search
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -30,8 +36,10 @@ async def process_event_task(ctx, event_data: dict):
     comprehension_pipeline = Pipeline([
         EventDeserializer(),
         InsightGenerator(),
-        KnowledgeGraphWriter(kg_service),
-        ChromaWriter(chroma_service),
+        [
+            KnowledgeGraphWriter(kg_service),
+            ChromaWriter(chroma_service),
+        ],
         SynthesisTrigger(),
     ])
 
@@ -49,7 +57,6 @@ async def process_event_task(ctx, event_data: dict):
 
     except Exception as e:
         logger.error(f"Comprehension pipeline failed: {e}", exc_info=True)
-
 
 async def on_startup(ctx):
     """
@@ -75,9 +82,29 @@ async def synthesis_task(ctx, query_text: str):
     """
     ARQ task to perform synthesis on the given query text.
     """
-    logger.info(f"Synthesizing information for query: {query_text[:50]}...")
-    agent = SynthesisAgent()
-    await agent.synthesize_insights(query_text)
+    logger.info(f"--- Starting Synthesis Pipeline for Query: {query_text[:50]}... ---")
+
+    # 1. Instantiate services.
+    chroma_service = ChromaService()
+    upstash_service = UpstashService()
+    llm_service = LLMService()
+
+    # 2. Define the pipeline.
+    synthesis_pipeline = create_synthesis_pipeline(chroma_service, upstash_service, llm_service)
+
+    context = {
+        "redis": ctx.get("redis"),
+        "google_search": google_search
+    }
+
+    try:
+        await synthesis_pipeline.execute(
+            data=query_text,
+            context=context
+        )
+        logger.info(f"--- Synthesis Pipeline Finished Successfully ---")
+    except Exception as e:
+        logger.error(f"Synthesis pipeline failed: {e}", exc_info=True)
 
 class WorkerSettings:
     functions = [process_event_task, curate_corpus_task, synthesis_task]

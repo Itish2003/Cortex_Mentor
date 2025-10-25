@@ -92,8 +92,8 @@ graph TD
     %% ---> Flow 3: Level 2 Synthesis (The "Thinking" Step)
     AGENT_L1 -- "5. Enqueues<br/>Synthesis Task" --> E
     E -- "6. Dispatches Job" --> AGENT_L2
-    AGENT_L2 -- "7a. Queries<br/>User History" --> G
-    AGENT_L2 -- "7b. Queries<br/>Expert Knowledge" --> I
+    AGENT_L2 -- "7a. Queries / Gets Results" --- G
+    AGENT_L2 -- "7b. Queries / Gets Results" --- I
     
     %% ---> Flow 4: Level 3 Engagement (Delivering Guidance)
     AGENT_L2 -- "8. Enqueues<br/>Guidance Task" --> E
@@ -140,13 +140,12 @@ The application's code is organized into a modular structure within the `src/cor
     - `chroma_service.py`: Manages all interactions with the local ChromaDB instance, including adding documents and querying for similar insights.
     - `upstash_service.py`: Manages all interactions with the Upstash Vector DB, handling the public MCP Knowledge Base.
 
-- **`agents/`**: Contains the AI agents that perform the core logic of the application.
-    - `level2_synthesis.py`: The Level 2 agent queries both the private and public knowledge stores to synthesize higher-level insights and form expert opinions.
+- **`agents/`**: Contains the remaining AI agents that perform core logic. This is being progressively refactored into the `pipelines` model.
     - `level3_curation/corpus_curator.py`: The Corpus Curator agent is responsible for curating and populating the public MCP Knowledge Base in the background.
 
-## 7. Current Operational Flow (Pipeline-based L1)
+## 7. Current Operational Flow (Pipeline-based)
 
-This diagram shows the architecture that has been successfully implemented and tested. The Level 1 Comprehension is now handled by a modular Pipeline & Processor model, which processes raw events, persists insights, and triggers the Level 2 Synthesis.
+This diagram shows the current architecture. The core logic is handled by a modular Pipeline & Processor model. The `Comprehension Pipeline` processes raw events, and the `Synthesis Pipeline` combines insights from the private and public knowledge stores, and includes a gateway to trigger a curation pipeline if the public knowledge is insufficient.
 
 ```mermaid
 graph TD
@@ -158,7 +157,13 @@ graph TD
         B(FastAPI Gateway)
         C(ARQ Task Queue)
         P[Comprehension Pipeline]
-        E[L2 Synthesis Agent]
+        S(Synthesis Pipeline)
+        subgraph "Private Knowledge Pipeline"
+            PKP[RunPrivatePipeline]
+        end
+        subgraph "Public Knowledge Pipeline"
+            PUBP[RunPublicPipeline]
+        end
     end
 
     subgraph "Data Stores"
@@ -173,9 +178,13 @@ graph TD
     P -- Writes to --> F
     P -- Writes to --> H
     P -- Triggers L2 Job --> C
-    C -- Dispatches --> E
-    E -- Queries --> F
-    E -- Queries --> G
+    C -- Dispatches --> S
+    S -- runs in parallel --> PKP
+    S -- runs in parallel --> PUBP
+    PKP -- Queries --> F
+    PKP -- Traverses --> H
+    PUBP -- Queries --> G
+    PUBP -- Augments --> G
 ```
 
 ## 6. Refactoring to a Pipeline & Processor Model
@@ -195,9 +204,14 @@ graph TD
         direction LR
         C(Pipeline) -- contains --> P1[P1: EventDeserializer]
         C -- contains --> P2[P2: InsightGenerator]
-        C -- contains --> P3[P3: KnowledgeGraphWriter]
-        C -- contains --> P4[P4: ChromaWriter]
-        C -- contains --> P5[P5: SynthesisTrigger]
+        subgraph "Parallel Final Steps"
+            P3[P3: KnowledgeGraphWriter]
+            P4[P4: ChromaWriter]
+            P5[P5: SynthesisTrigger]
+        end
+        C -- contains --> P3
+        C -- contains --> P4
+        C -- contains --> P5
     end
 
     %% Data Transformation Flow
@@ -215,8 +229,80 @@ graph TD
         B -- "initial_data(D1)" --> P1
         P1 -- "output(D2)" --> P2
         P2 -- "output(D3)" --> P3
-        P3 -- "output(D3)" --> P4
-        P4 -- "output(D3)" --> P5
+        P2 -- "output(D3)" --> P4
+        P2 -- "output(D3)" --> P5
+    end
+```
+
+This diagram shows the Synthesis Pipeline, which runs the private and public knowledge retrieval pipelines in parallel before synthesizing the final result.
+
+```mermaid
+graph TD
+    subgraph "ARQ Worker"
+        A["Start: Query Text"]
+        B(Build & Execute Synthesis Pipeline)
+    end
+
+    subgraph "Main Synthesis Pipeline"
+        direction LR
+        subgraph "Parallel Sub-Pipelines"
+            P1[RunPrivatePipeline]
+            P2[RunPublicPipeline]
+        end
+        C(Pipeline) -- contains --> P1
+        C(Pipeline) -- contains --> P2
+        C -- contains --> P3[InsightSynthesizer]
+    end
+
+    %% Data Transformation Flow
+    subgraph "Data Lifecycle"
+        direction LR
+        D1[String] --> D2_Private[Dict]
+        D1 --> D2_Public[Dict]
+        D2_Private --> D3[Dict]
+        D2_Public --> D3[Dict]
+    end
+
+    %% Link Execution to Data
+    A --> B
+    B -- Executes --> C
+
+    subgraph "Processor Sequence"
+        direction LR
+        B -- "initial_data(D1)" --> P1
+        B -- "initial_data(D1)" --> P2
+        P1 -- "output(D2_Private)" --> P3
+        P2 -- "output(D2_Public)" --> P3
+    end
+```
+
+This diagram shows the Private Knowledge Pipeline:
+
+```mermaid
+graph TD
+    subgraph "Private Knowledge Pipeline"
+        direction LR
+        A["Start: Query Text"]
+        B(Pipeline) -- contains --> P1[PrivateKnowledgeQuerier]
+        B -- contains --> P2[GraphTraversalProcessor]
+        P1 -- "output(Dict)" --> P2
+        A -- "initial_data(String)" --> P1
+    end
+```
+
+This diagram shows the Public Knowledge Pipeline:
+
+```mermaid
+graph TD
+    subgraph "Public Knowledge Pipeline"
+        direction LR
+        A["Start: Query Text"]
+        B(Pipeline) -- contains --> P1[PublicKnowledgeQuerier]
+        B -- contains --> P2[KnowledgeGatewayProcessor]
+        B -- contains --> P3[CurationTriggerProcessor]
+        P1 -- "output(Dict)" --> P2
+        P2 -- "output(Dict)" --> P3
+        A -- "initial_data(String)" --> P1
     end
 ```
 
