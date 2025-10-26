@@ -1,0 +1,12 @@
+name: 'Pull Request Review Trigger'
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  call-gemini-review:
+    uses: ./.github/workflows/gemini-code-review.yml
+    with:
+      additional_context: 'Please focus on architectural changes, pipeline efficiency, and adherence to Python best practices.'
+    secrets: inherit
