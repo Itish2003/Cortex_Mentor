@@ -96,7 +96,7 @@ class KnowledgeGatewayProcessor(Processor):
             name="knowledge_gateway_agent",
             instruction=self.prompt_manager.render("knowledge_gateway.jinja2"),
             output_schema=GatewayDecision,
-            model="gemini-2.5-flash",
+            model=llm_service.settings.gemini_flash_model,
         )
 
     async def process(self, data: dict, context: dict) -> dict:
@@ -171,7 +171,7 @@ class InsightSynthesizer(Processor):
             augmented_knowledge=augmented_knowledge
         )
 
-        final_insight = self.llm_service.generate(prompt, model="gemini-2.5-pro")
+        final_insight = self.llm_service.generate(prompt, model=self.llm_service.settings.gemini_pro_model)
         data["final_insight"] = final_insight
 
         logger.info(f"Final Insight: {final_insight}")

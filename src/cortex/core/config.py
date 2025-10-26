@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     llm_model: str = "llama3.1:latest"
     llm_api_url: str = "http://localhost:11434/api/generate"
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_flash_model: str = "gemini-2.5-flash"
+    gemini_pro_model: str = "gemini-2.5-pro"
 
 
     class Config:

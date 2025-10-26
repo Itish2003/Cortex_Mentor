@@ -2,7 +2,7 @@
 name = "cortex"
 version = "0.1.0"
 description = "Cortex Mentor Application"
-authors = ["Your Name <you@example.com>"]
+authors = ["Itish Srivastava <itish.github.io@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"

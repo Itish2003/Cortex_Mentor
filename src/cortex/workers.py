@@ -31,11 +31,12 @@ async def process_event_task(ctx, event_data: dict):
     # 1. Instantiate services that the processors will need.
     kg_service = KnowledgeGraphService()
     chroma_service = ChromaService()
+    llm_service = LLMService()
 
     # 2. Define the pipeline by injecting dependencies into the processors.
     comprehension_pipeline = Pipeline([
         EventDeserializer(),
-        InsightGenerator(),
+        InsightGenerator(llm_service=llm_service),
         [
             KnowledgeGraphWriter(kg_service),
             ChromaWriter(chroma_service),

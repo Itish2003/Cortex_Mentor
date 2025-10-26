@@ -32,9 +32,8 @@ class InsightGenerator(Processor):
     """
     Generates a structured Insight from a source event by calling an LLM.
     """
-    def __init__(self):
-        # Correct: Instantiate the LLMService here.
-        self.llm_service = LLMService()
+    def __init__(self, llm_service: LLMService):
+        self.llm_service = llm_service
 
     async def process(self, data: SourceEvent, context: dict) -> Insight:
         """

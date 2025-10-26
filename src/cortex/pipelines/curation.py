@@ -33,18 +33,18 @@ def create_curation_agent(upstash_service: UpstashService, llm_service: LLMServi
         """Writes the given data to the Upstash knowledge base."""
         return await upstash_writer.write(data)
 
-    web_searcher = create_google_search_agent(model="gemini-2.5-flash")
+    web_searcher = create_google_search_agent(model=llm_service.settings.gemini_flash_model)
 
     security_analyst = LlmAgent(
         name="security_analyst",
         instruction="You are a security analyst. Analyze the provided text for any security implications, vulnerabilities, or best practices. Summarize your findings.",
-        model="gemini-2.5-flash",
+        model=llm_service.settings.gemini_flash_model,
     )
 
     best_practices_analyst = LlmAgent(
         name="best_practices_analyst",
         instruction="You are a software architect. Analyze the provided text for software development best practices, design patterns, or architectural principles. Summarize your findings.",
-        model="gemini-2.5-flash",
+        model=llm_service.settings.gemini_flash_model,
     )
 
     parallel_analyzer = ParallelAgent(
@@ -58,7 +58,7 @@ def create_curation_agent(upstash_service: UpstashService, llm_service: LLMServi
         best_practices_analysis = ""
 
         for event in callback_context.session.events:
-            if event.author == "google_search_agent" and event.is_final_response() and event.content and event.content.parts:
+            if event.author == web_searcher.name and event.is_final_response() and event.content and event.content.parts:
                 web_search_results = "".join([part.text for part in event.content.parts if part.text])
             if event.author == "security_analyst" and event.is_final_response() and event.content and event.content.parts:
                 security_analysis = "".join([part.text for part in event.content.parts if part.text])
@@ -77,7 +77,7 @@ def create_curation_agent(upstash_service: UpstashService, llm_service: LLMServi
     chief_editor = LlmAgent(
         name="chief_editor",
         instruction="This will be replaced by the callback.",
-        model="gemini-2.5-pro",
+        model=llm_service.settings.gemini_pro_model,
         tools=[FunctionTool(func=UpstashWriterTool)],
         before_model_callback=chief_editor_callback,
     )

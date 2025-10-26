@@ -32,8 +32,9 @@ class LLMService:
 
     def _generate_with_gemini(self, prompt: str, model: str) -> str:
         try:
-            client = genai.Client()
-            response = client.models.generate_content(
+            if not hasattr(self, "_gemini_client"):
+                self._gemini_client = genai.Client()
+            response = self._gemini_client.models.generate_content(
                 model=model,
                 contents=prompt
             )
