@@ -47,10 +47,8 @@ def create_synthesis_pipeline(chroma_service: ChromaService, upstash_service: Up
             RunPrivatePipeline(chroma_service, settings),
             RunPublicPipeline(upstash_service, llm_service),
         ],
-        InsightSynthesizer(),
+        InsightSynthesizer(llm_service),
     ])
-
-
 
 class PrivateKnowledgeQuerier(Processor):
     """
@@ -85,21 +83,20 @@ class PublicKnowledgeQuerier(Processor):
 class GatewayDecision(BaseModel):
     needs_improvement: bool
 
+from cortex.services.prompt_manager import PromptManager
+
 class KnowledgeGatewayProcessor(Processor):
     """
     A gateway processor that uses an LLM agent to decide if knowledge needs improvement.
     """
     def __init__(self, llm_service: LLMService):
         self.llm_service = llm_service
+        self.prompt_manager = PromptManager()
         self.gateway_agent = LlmAgent(
             name="knowledge_gateway_agent",
-            instruction="""
-            Given the user's query and the retrieved context from our expert knowledge base,
-            evaluate if the context is sufficient and relevant to provide a high-quality answer.
-            Your response must be a JSON object with a single key 'needs_improvement' and a boolean value (true or false).
-            """,
+            instruction=self.prompt_manager.render("knowledge_gateway.jinja2"),
             output_schema=GatewayDecision,
-            model=llm_service.model, # Explicitly set the model
+            model="gemini-2.5-flash",
         )
 
     async def process(self, data: dict, context: dict) -> dict:
@@ -108,14 +105,11 @@ class KnowledgeGatewayProcessor(Processor):
         public_results = data.get("public_results", [])
         public_context = "\n".join([str(r) for r in public_results])
 
-        prompt = f"""
-        User Query: "{query_text}"
-
-        Retrieved Context:
-        ---
-        {public_context}
-        ---
-        """
+        prompt = self.prompt_manager.render(
+            "knowledge_gateway.jinja2",
+            query_text=query_text,
+            public_context=public_context
+        )
         
         evaluation_str = await run_standalone_agent(self.gateway_agent, prompt)
         
@@ -154,18 +148,31 @@ class CurationTriggerProcessor(Processor):
 class InsightSynthesizer(Processor):
     """
     Synthesizes the final insight from all gathered knowledge.
-    (Placeholder)
     """
+    def __init__(self, llm_service: LLMService):
+        self.llm_service = llm_service
+        self.prompt_manager = PromptManager()
+
     async def process(self, data: dict, context: dict) -> dict:
-        logger.info("[Placeholder] Synthesizing final insight...")
+        logger.info("Synthesizing final insight...")
         private_knowledge = data.get("private_knowledge", {})
         public_knowledge = data.get("public_knowledge", {})
 
-        # Example of accessing the nested data:
         private_results = private_knowledge.get("private_results")
         traversed_knowledge = private_knowledge.get("traversed_knowledge")
         public_results = public_knowledge.get("public_results")
         augmented_knowledge = public_knowledge.get("augmented_knowledge")
 
-        logger.info(f"Final Synthesis Results: {data}")
+        prompt = self.prompt_manager.render(
+            "insight_synthesis.jinja2",
+            private_results=private_results,
+            traversed_knowledge=traversed_knowledge,
+            public_results=public_results,
+            augmented_knowledge=augmented_knowledge
+        )
+
+        final_insight = self.llm_service.generate(prompt, model="gemini-2.5-pro")
+        data["final_insight"] = final_insight
+
+        logger.info(f"Final Insight: {final_insight}")
         return data

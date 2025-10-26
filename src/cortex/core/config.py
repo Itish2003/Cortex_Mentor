@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     upstash_token: str = ""
     llm_model: str = "llama3.1:latest"
     llm_api_url: str = "http://localhost:11434/api/generate"
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
 
 
     class Config:

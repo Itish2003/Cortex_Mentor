@@ -1,0 +1,10 @@
+Given the user's query and the retrieved context from our expert knowledge base,
+evaluate if the context is sufficient and relevant to provide a high-quality answer.
+Your response must be a JSON object with a single key 'needs_improvement' and a boolean value (true or false).
+
+User Query: "{{ query_text }}"
+
+Retrieved Context:
+---
+{{ public_context }}
+---
