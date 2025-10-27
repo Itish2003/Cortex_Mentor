@@ -1,15 +1,24 @@
 # Cortex Mentor: An AI-Powered Software Development Mentor
 
-Cortex Mentor is an event-driven, agentic framework designed to observe a developer's workflow, build a private knowledge graph of their activities, and provide intelligent insights and guidance. It uses a local-first RAG (Retrieval-Augmented Generation) architecture, ensuring user privacy while leveraging powerful local AI models.
+Cortex Mentor is an advanced, event-driven, and privacy-focused AI assistant designed to accelerate software development. It acts as a persistent, personalized mentor that observes a developer's workflow, understands the context behind their actions, and provides intelligent, timely insights.
 
-## Features
-- **Event-Driven Architecture**: Ingests events from various observers (Git hooks, file watchers, etc.) via a FastAPI gateway.
-- **Asynchronous Task Processing**: Uses ARQ and Redis to manage a robust background task queue for processing events without blocking.
-- **AI Agent Fleet**: A multi-level agent system (`SynthesisAgent`, etc.) processes raw data into structured insights.
-- **Hybrid Knowledge Store**: 
-    - **Markdown Zettelkasten**: Human-readable logs of all insights are stored in local markdown files.
-    - **Vector Search Index**: ChromaDB and local Ollama embeddings power a searchable index over the knowledge graph for fast, semantic retrieval.
-- **Local First & Private**: All user data, models, and services run entirely on the local machine, guaranteeing privacy.
+At its core, Cortex Mentor is built on a **Hybrid Knowledge Model**, combining a private, local-first knowledge graph with a public, cloud-based knowledge base. This ensures that all user-specific data remains secure and private on the local machine, while still allowing the system to leverage powerful cloud-based models and curated expert knowledge.
+
+## Key Architectural Pillars
+
+- **Pipeline-Based Architecture**: The system is built on a modular and scalable pipeline architecture. Each stage of the process, from understanding raw events to synthesizing complex insights, is handled by a series of self-contained, reusable "Processors."
+
+- **Parallel Processing**: For maximum efficiency, the synthesis pipeline runs independent sub-pipelines in parallel. It concurrently queries and traverses the private knowledge graph while also querying and augmenting the public knowledge base, significantly reducing latency.
+
+- **Multi-Agent System**: Cortex Mentor uses a sophisticated, multi-agent system (powered by the Google ADK framework) for complex reasoning and data augmentation. This includes a sequential pipeline of agents that can perform web searches, analyze results from multiple perspectives, and synthesize new knowledge.
+
+- **Hybrid Knowledge Stores**:
+    - **Private Knowledge Graph (Zettelkasten & VectorDB)**: A local-first system where a developer's activity is recorded in a human-readable, interlinked Markdown knowledge graph. This is supplemented by a local ChromaDB vector store for fast semantic search, with all embeddings generated locally via Ollama to ensure privacy.
+    - **Public Knowledge Base**: A cloud-based Upstash vector database containing curated, high-quality software development knowledge, which can be intelligently and automatically augmented over time.
+
+- **Hybrid LLM Strategy**: The system intelligently uses different LLMs for different tasks. It leverages local Ollama models for processing private, sensitive data, and powerful cloud-based Gemini models (2.5 Pro and 2.5 Flash) for tasks requiring vast world knowledge and complex reasoning, such as web search analysis and final insight synthesis.
+
+- **Local-First & Private**: All user-specific data, including source code, commit messages, and the private knowledge graph, remains on the local machine. Privacy is a foundational principle of the architecture.
 
 ## Project Structure
 - `src/cortex/main.py`: FastAPI app serving as the API gateway.
