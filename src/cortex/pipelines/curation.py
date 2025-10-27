@@ -1,13 +1,16 @@
 from cortex.pipelines.processors import Processor
 from cortex.services.upstash_service import UpstashService
 from cortex.services.llmservice import LLMService
-from google.adk.agents import LlmAgent, SequentialAgent, ParallelAgent, CallbackContext
+from google.adk.agents import LlmAgent, SequentialAgent, ParallelAgent
+from google.adk.agents.callback_context import CallbackContext
 from google.adk.models.llm_request import LlmRequest
+from google.genai import types
 from cortex.utility.agent_runner import run_standalone_agent
-from google.adk.tools import FunctionTool, google_search
+from google.adk.tools import FunctionTool
 import logging
 import uuid
-import asyncio
+from google.adk.tools.google_search_agent_tool import create_google_search_agent
+from cortex.services.prompt_manager import PromptManager
 
 logger = logging.getLogger(__name__)
 
@@ -22,27 +25,26 @@ class UpstashWriter:
         await self.upstash_service.add_document(doc_id=doc_id, content=data, metadata=metadata)
         return "Successfully wrote data to Upstash."
 
-from google.adk.tools.google_search_agent_tool import create_google_search_agent
-
 def create_curation_agent(upstash_service: UpstashService, llm_service: LLMService) -> SequentialAgent:
     upstash_writer = UpstashWriter(upstash_service)
+    prompt_manager = PromptManager()
 
     async def UpstashWriterTool(data: str) -> str:
         """Writes the given data to the Upstash knowledge base."""
         return await upstash_writer.write(data)
 
-    web_searcher = create_google_search_agent(model=llm_service.model)
+    web_searcher = create_google_search_agent(model=llm_service.settings.gemini_flash_model)
 
     security_analyst = LlmAgent(
         name="security_analyst",
         instruction="You are a security analyst. Analyze the provided text for any security implications, vulnerabilities, or best practices. Summarize your findings.",
-        model=llm_service.model,
+        model=llm_service.settings.gemini_flash_model,
     )
 
     best_practices_analyst = LlmAgent(
         name="best_practices_analyst",
         instruction="You are a software architect. Analyze the provided text for software development best practices, design patterns, or architectural principles. Summarize your findings.",
-        model=llm_service.model,
+        model=llm_service.settings.gemini_flash_model,
     )
 
     parallel_analyzer = ParallelAgent(
@@ -56,33 +58,27 @@ def create_curation_agent(upstash_service: UpstashService, llm_service: LLMServi
         best_practices_analysis = ""
 
         for event in callback_context.session.events:
-            if event.author == "web_searcher" and event.is_final_response():
+            if event.author == web_searcher.name and event.is_final_response() and event.content and event.content.parts:
                 web_search_results = "".join([part.text for part in event.content.parts if part.text])
-            if event.author == "security_analyst" and event.is_final_response():
+            if event.author == "security_analyst" and event.is_final_response() and event.content and event.content.parts:
                 security_analysis = "".join([part.text for part in event.content.parts if part.text])
-            if event.author == "best_practices_analyst" and event.is_final_response():
+            if event.author == "best_practices_analyst" and event.is_final_response() and event.content and event.content.parts:
                 best_practices_analysis = "".join([part.text for part in event.content.parts if part.text])
         
-        prompt = f"""You are a chief editor. You have received a summary of a topic from a web search, and analyses from a security analyst and a best practices analyst.
-        Your job is to synthesize all of this information into a single, coherent, and high-quality summary that is ready to be saved to a knowledge base.
+        prompt = prompt_manager.render(
+            "chief_editor.jinja2",
+            web_search_results=web_search_results,
+            security_analysis=security_analysis,
+            best_practices_analysis=best_practices_analysis
+        )
 
-        Web Search Results:
-        {web_search_results}
-
-        Security Analysis:
-        {security_analysis}
-
-        Best Practices Analysis:
-        {best_practices_analysis}
-
-        Synthesize these into a final, comprehensive summary."""
-
-        llm_request.contents = [prompt]
+        llm_request.contents = [types.Content(parts=[types.Part(text=prompt)])]
 
     chief_editor = LlmAgent(
         name="chief_editor",
         instruction="This will be replaced by the callback.",
-        model=llm_service.model,
+        model=llm_service.settings.gemini_pro_model,
+        tools=[FunctionTool(func=UpstashWriterTool)],
         before_model_callback=chief_editor_callback,
     )
 
@@ -112,13 +108,7 @@ class CurationProcessor(Processor):
         # Immediately add the augmented knowledge to the data dictionary
         data["augmented_knowledge"] = final_summary
 
-        # Create a background task to write the final summary to the knowledge base
-        async def write_to_knowledge_base():
-            logger.info("Starting background task to write to knowledge base...")
-            upstash_writer = UpstashWriter(self.upstash_service)
-            await upstash_writer.write(final_summary)
-            logger.info("Background task to write to knowledge base finished.")
-
-        asyncio.create_task(write_to_knowledge_base())
+        # The writing to the knowledge base is now handled by the chief_editor agent.
+        # We no longer need a separate background task here.
 
         return data

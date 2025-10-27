@@ -2,7 +2,7 @@
 name = "cortex"
 version = "0.1.0"
 description = "Cortex Mentor Application"
-authors = ["Your Name <you@example.com>"]
+authors = ["Itish Srivastava <itish.github.io@gmail.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.9"
@@ -18,6 +18,8 @@ redis = "^5.0.4"
 upstash-vector = "^0.5.0"
 PyYAML = "6.0.3"
 google-adk = "1.16.0"
+google-genai = "^1.46.0"
+Jinja2 = "^3.1.6"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

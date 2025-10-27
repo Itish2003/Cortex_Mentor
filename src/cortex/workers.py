@@ -1,4 +1,4 @@
-from cortex.agents.level3_curation.corpus_curator import CorpusCuratorAgent
+
 from cortex.models.insights import Insight
 import logging
 from cortex.core.redis import create_redis_pool, close_redis_pool
@@ -31,11 +31,12 @@ async def process_event_task(ctx, event_data: dict):
     # 1. Instantiate services that the processors will need.
     kg_service = KnowledgeGraphService()
     chroma_service = ChromaService()
+    llm_service = LLMService()
 
     # 2. Define the pipeline by injecting dependencies into the processors.
     comprehension_pipeline = Pipeline([
         EventDeserializer(),
-        InsightGenerator(),
+        InsightGenerator(llm_service=llm_service),
         [
             KnowledgeGraphWriter(kg_service),
             ChromaWriter(chroma_service),
@@ -70,14 +71,6 @@ async def on_shutdown(ctx):
     """
     await close_redis_pool(ctx.get("redis"))
 
-async def curate_corpus_task(ctx, data):
-    """
-
-    ARQ task to curate and save data to the public MCP knowledge base.
-    """
-    agent = CorpusCuratorAgent()
-    await agent.curate_and_save(data)
-
 async def synthesis_task(ctx, query_text: str):
     """
     ARQ task to perform synthesis on the given query text.
@@ -107,8 +100,7 @@ async def synthesis_task(ctx, query_text: str):
         logger.error(f"Synthesis pipeline failed: {e}", exc_info=True)
 
 class WorkerSettings:
-    functions = [process_event_task, curate_corpus_task, synthesis_task]
+    functions = [process_event_task, synthesis_task]
     queues = ['high_priority', 'low_priority']
     on_startup = on_startup
     on_shutdown = on_shutdown
-  

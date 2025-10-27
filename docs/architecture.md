@@ -128,8 +128,7 @@ The application's code is organized into a modular structure within the `src/cor
 
 - **`api/events.py`**: Defines the API endpoints for receiving events. It handles incoming HTTP requests, validates the event data using Pydantic models, and enqueues the events as jobs in the ARQ task queue.
 
-- **`workers.py`**: Configures the ARQ worker settings. It defines the tasks that the workers can execute (e.g., `process_event_task`, `curate_corpus_task`) and maps them to specific queues (e.g., `high_priority`, `low_priority`).
-
+    - **`workers.py`**: Configures the ARQ worker settings. It defines the tasks that the workers can execute (e.g., `process_event_task`, `synthesis_task`) and maps them to specific queues (e.g., `high_priority`, `low_priority`).
 - **`core/`**: Contains the core application logic and configuration.
     - `config.py`: Manages application settings using Pydantic's `BaseSettings`, allowing for configuration via environment variables.
     - `redis.py`: Handles the creation and lifecycle of the Redis connection pool for the ARQ task queue.

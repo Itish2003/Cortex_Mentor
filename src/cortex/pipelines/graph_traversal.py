@@ -2,10 +2,10 @@ from cortex.pipelines.processors import Processor
 import logging
 import os
 import re
+import yaml
+from typing import Optional
 
 logger = logging.getLogger(__name__)
-
-from typing import Optional
 
 class GraphTraversalProcessor(Processor):
     """
@@ -25,19 +25,17 @@ class GraphTraversalProcessor(Processor):
 
         entry_points = documents[0]
         traversed_content = []
+        visited = set()
 
         for entry_point in entry_points:
             # The entry point from ChromaDB is a full path, we need the relative path
             relative_path = os.path.relpath(entry_point, self.knowledge_graph_root)
-            traversed_content.append(self._traverse(relative_path))
+            traversed_content.append(self._traverse(relative_path, visited))
 
         data["traversed_knowledge"] = "\n".join(traversed_content)
         return data
 
-    def _traverse(self, file_path: str, visited: Optional[set] = None) -> str:
-        if visited is None:
-            visited = set()
-
+    def _traverse(self, file_path: str, visited: set) -> str:
         if file_path in visited:
             return ""
 
@@ -51,13 +49,21 @@ class GraphTraversalProcessor(Processor):
             logger.warning(f"File not found during graph traversal: {full_path}")
             return ""
 
-        # Find all [[links]] in the content
-        links = re.findall(r"[[(.*?)]]", content)
-        traversed_content = [content]
+        # Separate front matter from content
+        try:
+            _, front_matter_str, body = content.split("---", 2)
+            front_matter = yaml.safe_load(front_matter_str) or {}
+        except ValueError:
+            front_matter = {}
+            body = content
+
+        # Find all [[links]] in the front matter and body
+        links = re.findall(r"\[\[(.*?)\]\]", content)
+        traversed_content = [body]
 
         for link in links:
-            # For now, we assume links are file names. A more robust solution
-            # would handle different link formats.
-            traversed_content.append(self._traverse(link, visited))
+            # Resolve the link relative to the current file's directory
+            link_path = os.path.normpath(os.path.join(os.path.dirname(file_path), link))
+            traversed_content.append(self._traverse(link_path, visited))
 
         return "\n".join(traversed_content)

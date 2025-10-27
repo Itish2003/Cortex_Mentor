@@ -1,68 +1,84 @@
 import requests
 from ..core.config import Settings
+from google import genai
+from typing import Optional
+from .prompt_manager import PromptManager
 
 class LLMService:
     """
-    Service for interacting with Large Language Models (LLMs).
+    Service for interacting with Large Language Models (LLMs), supporting both local and cloud-based models.
     """
-    def __init__(self, model: str = Settings().llm_model, api_url: str = Settings().llm_api_url):
-        self.model = model
-        self.api_url = api_url
-
-    def generate_commit_summary(self,commit_message:str,commit_diff:str)-> str:
+    def __init__(self):
         """
-        Generates a semantic summary for a given commit using the LLM.
+        Initializes the LLMService. The google-genai library is configured automatically
+        by the genai.Client() constructor, which looks for the API key in the environment.
         """
-        prompt = f"""Analyze the following git commit and provide a concise, one-sentence semantic summary. Focus on the *intent* and *impact* of the change, not just a list of files. Do not start your response with 'This user' or 'This commit'. Just state the change directly.
+        self.settings = Settings()
+        self.prompt_manager = PromptManager()
+        self._gemini_client = genai.Client()
 
-            Example: "Refactored authentication module to improve security and performance."
+    def generate(self, prompt: str, model: Optional[str] = None) -> str:
+        """
+        Generates a response from the specified LLM.
 
-            Commit Message: {commit_message}
-            Commit Diff: {commit_diff}
+        Args:
+            prompt: The prompt to send to the LLM.
+            model: The name of the model to use. If not provided, defaults to the local model.
 
-            Semantic Summary:
-            """
-        
+        Returns:
+            The generated text from the LLM.
+        """
+        model_to_use = model or self.settings.llm_model
+
+        if model_to_use.startswith("gemini-"):
+            return self._generate_with_gemini(prompt, model_to_use)
+        else:
+            return self._generate_with_ollama(prompt, model_to_use)
+
+    def _generate_with_gemini(self, prompt: str, model: str) -> str:
         try:
-            response = requests.post(
-                self.api_url,
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False
-                }
+            response = self._gemini_client.models.generate_content(
+                model=model,
+                contents=prompt
             )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("response", "").strip()
-        except requests.RequestException as e:
-            print(f"Error communicating with LLM API: {e}")
-            return "No summary available due to LLM error."
+            if response.parts:
+                return "".join([part.text for part in response.parts if part.text]).strip()
+            return ""
+        except Exception as e:
+            print(f"Error communicating with Gemini API: {e}")
+            return f"No summary available due to Gemini API error: {e}"
 
-    def generate_code_change_summary(self, file_path: str, change_type: str, content: str) -> str:
-        """
-        Generates a semantic summary for a file change event.
-        """
-        prompt = f"""
-        A file was changed. Analyze the event and provide a concise, one-sentence semantic summary of the change's likely intent or impact.
-
-        File Path: {file_path}
-        Change Type: {change_type}
-        New Content:
-        ```
-        {content}
-        ```
-
-        Semantic Summary:
-        """
-
+    def _generate_with_ollama(self, prompt: str, model: str) -> str:
         try:
             response = requests.post(
-                self.api_url,
-                json={"model": self.model, "prompt": prompt, "stream": False},
+                self.settings.llm_api_url,
+                json={"model": model, "prompt": prompt, "stream": False},
             )
             response.raise_for_status()
             return response.json().get("response", "").strip()
         except requests.RequestException as e:
-            print(f"Error calling LLM service for code change: {e}")
-            return "Could not generate summary."
+            print(f"Error communicating with local LLM API: {e}")
+            return f"No summary available due to local LLM error: {e}"
+
+    def generate_commit_summary(self, commit_message: str, commit_diff: str) -> str:
+        """
+        Generates a semantic summary for a given commit using the local LLM.
+        """
+        prompt = self.prompt_manager.render(
+            "commit_summary.jinja2",
+            commit_message=commit_message,
+            commit_diff=commit_diff
+        )
+        return self.generate(prompt)
+
+    def generate_code_change_summary(self, file_path: str, change_type: str, content: str) -> str:
+        """
+        Generates a semantic summary for a file change event using the local LLM.
+        """
+        prompt = self.prompt_manager.render(
+            "code_change_summary.jinja2",
+            file_path=file_path,
+            change_type=change_type,
+            content=content
+        )
+        return self.generate(prompt)
