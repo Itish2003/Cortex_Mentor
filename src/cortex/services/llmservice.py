@@ -9,8 +9,13 @@ class LLMService:
     Service for interacting with Large Language Models (LLMs), supporting both local and cloud-based models.
     """
     def __init__(self):
+        """
+        Initializes the LLMService. The google-genai library is configured automatically
+        by the genai.Client() constructor, which looks for the API key in the environment.
+        """
         self.settings = Settings()
         self.prompt_manager = PromptManager()
+        self._gemini_client = genai.Client()
 
     def generate(self, prompt: str, model: Optional[str] = None) -> str:
         """
@@ -32,8 +37,6 @@ class LLMService:
 
     def _generate_with_gemini(self, prompt: str, model: str) -> str:
         try:
-            if not hasattr(self, "_gemini_client"):
-                self._gemini_client = genai.Client()
             response = self._gemini_client.models.generate_content(
                 model=model,
                 contents=prompt
