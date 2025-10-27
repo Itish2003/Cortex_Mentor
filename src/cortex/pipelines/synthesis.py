@@ -8,6 +8,8 @@ from cortex.pipelines.curation import CurationProcessor
 from pydantic import BaseModel
 from logging import Logger
 logger: Logger = logging.getLogger(__name__)
+from cortex.services.prompt_manager import PromptManager
+
 
 from google.adk.agents import LlmAgent
 from cortex.utility.agent_runner import run_standalone_agent
@@ -82,8 +84,6 @@ class PublicKnowledgeQuerier(Processor):
 
 class GatewayDecision(BaseModel):
     needs_improvement: bool
-
-from cortex.services.prompt_manager import PromptManager
 
 class KnowledgeGatewayProcessor(Processor):
     """
