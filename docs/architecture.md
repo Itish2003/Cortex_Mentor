@@ -9,8 +9,8 @@ The Cortex Mentor application is built on a **Hybrid Knowledge Model**, which se
 
 The core components are:
 
-- **Event-Driven API**: A FastAPI-based API receives events from observers like IDE plugins and Git hooks.
-- **Asynchronous Task Queue**: ARQ and Redis manage background jobs for event processing.
+- **Event-Driven API**: A FastAPI-based API receives events from observers like IDE plugins and Git hooks, and also manages WebSocket connections for real-time insight delivery.
+- **Asynchronous Task Queue**: ARQ and Redis manage background jobs for event processing, with workers publishing insights to Redis Pub/Sub for real-time delivery.
 - **Hybrid Knowledge Stores**:
     - **Private User Model (Zettelkasten & Search Index)**: This is a dual-component system for storing user-specific data securely on the user's machine.
         - **Markdown Files (Source of Truth)**: The `data/knowledge_graph/` directory contains interlinked markdown files that form the primary, human-readable, and persistent memory of the mentor's understanding of the user (the "Zettelkasten").
@@ -19,9 +19,12 @@ The core components are:
 - **AI Agent Fleet**:
     - **Level 1 (Comprehension)**: Processes raw events and stores insights in the private user model.
     - **Level 2 (Synthesis)**: Combines insights from both the private user model and the public MCP knowledge base to provide expert advice.
+    - **Level 3 (Engagement)**: An `AudioDeliveryProcessor` that uses Gemini TTS to convert synthesized insights into audio and delivers them in real-time.
     - **Corpus Curator**: A background agent responsible for populating and maintaining the public MCP knowledge base.
 - **Observers**: A collection of local tools that monitor file changes, Git hooks, and IDE events.
- 
+- **Real-time Communication**: WebSockets for client-server communication and Redis Pub/Sub as a message bus between background workers and the FastAPI server.
+- **AI Services**: Integration with Google Gemini models, including Gemini TTS for advanced audio synthesis.
+
 The following diagram illustrates the Hybrid Knowledge Model architecture:
 
 ```mermaid
@@ -42,23 +45,27 @@ graph TD
             G["<b>Local ChromaDB</b><br/><i>(The Searchable Index)</i>"]
             H["<b>Local Ollama</b><br/><i>(The Private Embedding Engine)</i>"]
         end
+        User([User])
     end
 
     subgraph "Cortex Backend (Server / Cloud)"
-        subgraph "Ingestion & Task Management"
+        subgraph "Real-time Delivery & Task Management"
             D[FastAPI Gateway]
+            D1(WebSocket Connections)
+            D2[Redis Pub/Sub]
             E["<b>ARQ Task Queue</b><br/><i>(Managed by Redis)</i>"]
         end
         
         subgraph "Agent Fleet (Persistent ARQ Workers)"
             AGENT_L1["<b>L1: Comprehension Agent</b><br/><i>Analyzes Raw Events</i>"]
             AGENT_L2["<b>L2: Synthesis & Strategy Agent</b><br/><i>Forms Opinions & Plans</i>"]
-            AGENT_L3["<b>L3: Engagement & Guidance Agent</b><br/><i>Crafts User-Facing Messages</i>"]
+            AGENT_L3["<b>L3: Engagement</b><br/><i>(AudioDeliveryProcessor)</i>"]
             AGENT_CURATOR["<b>Corpus Curator Agent</b><br/><i>(Background Librarian)</i>"]
         end
         
         subgraph "Public RAG System (MCP)"
             I["<b>Upstash Context Platform</b><br/><i>The Expert Knowledge Library</i>"]
+            J[Gemini TTS]
         end
     end
 
@@ -72,6 +79,8 @@ graph TD
     style F fill:#FADBD8,stroke:#C0392B,color:#000
     style G fill:#FDEDEC,stroke:#C0392B,color:#000
     style I fill:#D5F5E3,stroke:#2ECC71,color:#000
+    style J fill:#D5F5E3,stroke:#2ECC71,color:#000
+    style User fill:#FADBD8,stroke:#C0392B
 
     %% ===================================================
     %% 3. DEFINE ALL LINKS & DATA FLOWS LAST
@@ -96,9 +105,13 @@ graph TD
     AGENT_L2 -- "7b. Queries / Gets Results" --- I
     
     %% ---> Flow 4: Level 3 Engagement (Delivering Guidance)
-    AGENT_L2 -- "8. Enqueues<br/>Guidance Task" --> E
+    AGENT_L2 -- "8. Enqueues<br/>Delivery Task" --> E
     E -- "9. Dispatches Job" --> AGENT_L3
-    AGENT_L3 -- "10. Delivers<br/>Guidance" --> A
+    AGENT_L3 -- "10. Generates Audio via" --> J
+    AGENT_L3 -- "11. Publishes Audio to" --> D2
+    D -- "12. Broadcasts Audio via" --> D1
+    D1 -- "13. Delivers to" --> A
+    A -- "14. Presents to" --> User
     
     %% ---> Flow 5: Knowledge Curation (Parallel Background Process)
     AGENT_CURATOR -- "Curates & Populates<br/>the Mentor's Library" --> I
@@ -118,13 +131,17 @@ The application is designed for containerized deployment using Docker, ensuring 
 
 - **Public Knowledge Store (Upstash)**: Upstash is a serverless data platform that provides a managed vector database. It was chosen for the public MCP Knowledge Base due to its scalability, ease of use, and pay-as-you-go pricing, making it a cost-effective solution for storing and querying curated, expert knowledge.
 
+- **Real-time Communication (WebSockets & Redis Pub/Sub)**: To deliver insights to the user in real-time, the system uses a WebSocket connection managed by the FastAPI server. Background workers producing insights publish them to a Redis Pub/Sub channel, which the FastAPI server subscribes to, broadcasting the messages to all connected clients.
+
+- **AI Services (Gemini & Ollama)**: The application leverages a hybrid model strategy, using local Ollama models for privacy-sensitive tasks and powerful Google Gemini models (including Gemini TTS for audio synthesis) for advanced reasoning and content generation.
+
 - **CI/CD (GitHub Actions)**: The `.github/workflows/python-app.yml` file defines a continuous integration pipeline using GitHub Actions. This pipeline automates the process of installing dependencies, running tests, and linting the codebase on every push, ensuring code quality and stability.
 
 ## 3. Code Details
 
 The application's code is organized into a modular structure within the `src/cortex` directory, promoting separation of concerns and maintainability.
 
-- **`main.py`**: The main entry point of the FastAPI application. It initializes the app, sets up the lifespan events (like creating the Redis pool), and includes the API routers.
+- **`main.py`**: The main entry point of the FastAPI application. It initializes the app, sets up lifespan events (like creating the Redis pool), includes API routers, and manages WebSocket connections for real-time insight delivery.
 
 - **`api/events.py`**: Defines the API endpoints for receiving events. It handles incoming HTTP requests, validates the event data using Pydantic models, and enqueues the events as jobs in the ARQ task queue.
 
@@ -132,15 +149,21 @@ The application's code is organized into a modular structure within the `src/cor
 - **`core/`**: Contains the core application logic and configuration.
     - `config.py`: Manages application settings using Pydantic's `BaseSettings`, allowing for configuration via environment variables.
     - `redis.py`: Handles the creation and lifecycle of the Redis connection pool for the ARQ task queue.
+    - `ws_connection_manager.py`: A utility to manage active WebSocket connections.
 
-- **`models/events.py`**: Defines the Pydantic models for the event data structures, ensuring that all incoming data is well-formed and validated.
+- **`models/`**: Defines the Pydantic models for the event data structures, ensuring that all incoming data is well-formed and validated.
 
-- **`services/`**: Contains the service classes that provide an abstraction layer for interacting with external data stores.
+- **`services/`**: Contains the service classes that provide an abstraction layer for interacting with external data stores and APIs.
     - `chroma_service.py`: Manages all interactions with the local ChromaDB instance, including adding documents and querying for similar insights.
     - `upstash_service.py`: Manages all interactions with the Upstash Vector DB, handling the public MCP Knowledge Base.
+    - `llmservice.py`: Provides a unified interface for interacting with different LLMs (Ollama, Gemini).
+    - `prompt_manager.py`: Manages the loading and rendering of Jinja2 prompt templates.
 
-- **`agents/`**: Contains the remaining AI agents that perform core logic. This is being progressively refactored into the `pipelines` model.
-    - `level3_curation/corpus_curator.py`: The Corpus Curator agent is responsible for curating and populating the public MCP Knowledge Base in the background.
+- **`pipelines/`**: Contains the modular Pipeline & Processor architecture.
+    - `comprehension.py`: Defines the pipeline for processing raw events into insights.
+    - `synthesis.py`: Defines the pipeline for synthesizing knowledge from multiple sources.
+    - `curation.py`: Defines the multi-agent pipeline for augmenting public knowledge.
+    - `delivery.py`: Defines the final pipeline step for delivering the insight to the user.
 
 ## 7. Current Operational Flow (Pipeline-based)
 
@@ -233,7 +256,7 @@ graph TD
     end
 ```
 
-This diagram shows the Synthesis Pipeline, which runs the private and public knowledge retrieval pipelines in parallel before synthesizing the final result.
+This diagram shows the Synthesis Pipeline, which runs the private and public knowledge retrieval pipelines in parallel before synthesizing the final result and delivering it.
 
 ```mermaid
 graph TD
@@ -250,7 +273,8 @@ graph TD
         end
         C(Pipeline) -- contains --> P1
         C(Pipeline) -- contains --> P2
-        C -- contains --> P3[InsightSynthesizer]
+        C(Pipeline) -- contains --> P3[InsightSynthesizer]
+        C -- contains --> P4[AudioDeliveryProcessor]
     end
 
     %% Data Transformation Flow
@@ -315,3 +339,56 @@ graph TD
     *   `ChromaWriter`: Adds the machine-readable embedding to the ChromaDB index.
     *   `SynthesisTrigger`: Enqueues a new job for the next pipeline (e.g., the Synthesis Pipeline).
 3.  **Data Flow**: The output of each processor becomes the input for the next, allowing data to be progressively enriched and transformed as it moves through the pipeline.
+
+## 8. Real-time Audio Insight Delivery
+
+This diagram details the final stage of the process: delivering the synthesized insight to the user as a real-time audio stream. This flow decouples the background processing from the client-facing web server using a Redis Pub/Sub message bus.
+
+```mermaid
+graph TD
+    subgraph "ARQ Worker (Background Process)"
+        A["<b>Synthesis Pipeline</b><br/>(Final Stage)"]
+        P4[AudioDeliveryProcessor]
+        TTS[Gemini TTS API]
+        
+        A -- "1. Final Insight (Text)" --> P4
+        P4 -- "2. Generates Audio" --> TTS
+        TTS -- "3. Returns Audio Data" --> P4
+    end
+
+    subgraph "Redis (Message Bus)"
+        R[("Pub/Sub Channel<br/>'insights_channel'")]
+        P4 -- "4. Publishes Audio Data" --> R
+    end
+
+    subgraph "FastAPI Server (Web Process)"
+        WSS["<b>WebSocket Manager</b><br/>(Listens to Redis)"]
+        WSC(Active WebSocket<br/>Connections)
+        
+        R -- "5. Receives Message" --> WSS
+        WSS -- "6. Broadcasts Audio Data" --> WSC
+    end
+
+    subgraph "User's Local Machine"
+        UI[IDE Plugin / Client UI]
+        
+        WSC -- "7. Streams Audio" --> UI
+        UI -- "8. Plays Audio" --> User([User])
+    end
+
+    style A fill:#D5F5E3,stroke:#2ECC71
+    style P4 fill:#D5F5E3,stroke:#2ECC71
+    style WSS fill:#D6EAF8,stroke:#3498DB
+    style UI fill:#FADBD8,stroke:#C0392B
+```
+
+### Flow Description:
+
+1.  **Final Insight**: The `Synthesis Pipeline` completes its work, producing a final, human-readable insight as a string of text.
+2.  **Audio Generation**: This text is passed to the `AudioDeliveryProcessor`. This processor makes an API call to the **Google Gemini TTS service** to convert the text into high-quality audio data.
+3.  **Return Audio**: The Gemini TTS service returns the generated audio.
+4.  **Publish to Redis**: The `AudioDeliveryProcessor` takes the audio data and publishes it as a message to a specific Redis Pub/Sub channel, named `insights_channel`. This action is fire-and-forget; the worker's job is done.
+5.  **Receive Message**: The main FastAPI web server process has a long-running task (a `WebSocketManager`) that is subscribed to the `insights_channel`. It immediately receives the audio data message.
+6.  **Broadcast to Clients**: The `WebSocketManager` iterates through all active WebSocket connections it is managing and broadcasts the audio data to every connected client.
+7.  **Stream to UI**: The client-side UI (e.g., a VS Code extension) receives the binary audio data through its WebSocket connection.
+8.  **Playback**: The UI uses a local audio player to play the audio stream, delivering the Cortex Mentor's insight to the user in real-time.

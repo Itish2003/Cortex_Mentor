@@ -33,7 +33,9 @@ To bridge this gap and make the system useful, the next logical steps are to imp
     1.  Take the rich, multi-hop context from the private knowledge pipeline and the augmented context from the public knowledge pipeline.
     2.  Use an LLM to perform a final synthesis, generating a single, high-quality, and human-readable insight.
 
-- **Proposed Enhancement**: Implement a basic Level 3 Engagement Agent.
+- **Proposed Enhancement**: Implement a real-time, audio-based `AudioDeliveryProcessor`.
 - **Logic**:
-    1.  Create a new pipeline or processor that takes the final insight from the `InsightSynthesizer`.
-    2.  For now, this agent can simply log the final insight in a clear, user-friendly format. This will serve as the foundation for future integrations with IDEs or other user interfaces.
+    1.  Create a new `AudioDeliveryProcessor` that takes the final text insight from the `InsightSynthesizer`.
+    2.  This processor will use the **Gemini TTS API** to convert the text into a high-quality, natural-sounding audio stream.
+    3.  The processor will then publish this audio data to a **Redis Pub/Sub channel**.
+    4.  A **WebSocket manager** in the main FastAPI application will listen to this channel and broadcast the audio to all connected clients (e.g., a VS Code plugin), providing a real-time, voice-based experience.
