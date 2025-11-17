@@ -1,6 +1,8 @@
 # Cortex Mentor: An AI-Powered Software Development Mentor
 
-Cortex Mentor is an advanced, event-driven, and privacy-focused AI assistant designed to accelerate software development. It acts as a persistent, personalized mentor that observes a developer's workflow, understands the context behind their actions, and provides intelligent, timely insights.
+Cortex Mentor is an advanced, event-driven, and privacy-focused AI assistant designed to accelerate software development. It acts as a persistent, personalized mentor that observes a developer's workflow, understands the context behind their actions, and provides intelligent, real-time audio insights.
+
+This repository contains the **backend services** for Cortex Mentor. The frontend client is a VS Code extension located in the `cortex-vs` directory.
 
 At its core, Cortex Mentor is built on a **Hybrid Knowledge Model**, combining a private, local-first knowledge graph with a public, cloud-based knowledge base. This ensures that all user-specific data remains secure and private on the local machine, while still allowing the system to leverage powerful cloud-based models and curated expert knowledge.
 
@@ -18,18 +20,17 @@ At its core, Cortex Mentor is built on a **Hybrid Knowledge Model**, combining a
 
 - **Hybrid LLM Strategy**: The system intelligently uses different LLMs for different tasks. It leverages local Ollama models for processing private, sensitive data, and powerful cloud-based Gemini models (2.5 Pro and 2.5 Flash) for tasks requiring vast world knowledge and complex reasoning, such as web search analysis and final insight synthesis.
 
+- **Real-time Audio Delivery**: The system delivers insights as real-time audio streams using Google's Text-to-Speech API, WebSockets, and a Redis Pub/Sub message bus for a seamless, ambient user experience.
+
 - **Local-First & Private**: All user-specific data, including source code, commit messages, and the private knowledge graph, remains on the local machine. Privacy is a foundational principle of the architecture.
 
 ## Project Structure
-- `src/cortex/main.py`: FastAPI app serving as the API gateway.
+- `src/cortex/main.py`: FastAPI app serving as the API gateway and WebSocket server.
 - `src/cortex/workers.py`: ARQ worker definitions for background task processing.
 - `src/cortex/api/events.py`: API endpoint for event ingestion.
-- `src/cortex/agents/`: The AI agents responsible for data processing and insight generation.
-- `src/cortex/services/`: Services for interacting with ChromaDB, Ollama, and the Knowledge Graph.
+- `src/cortex/pipelines/`: The modular Pipeline & Processor architecture.
+- `src/cortex/services/`: Services for interacting with ChromaDB, Ollama, and other external APIs.
 - `src/cortex/models/`: Pydantic models for events and insights.
-- `src/cortex/services/knowledge_graph_service.py`: Manages the Zettelkasten-style markdown knowledge graph.
-- `src/cortex/services/llmservice.py`: Service for interacting with local LLMs for summary generation.
-- `src/cortex/models/insights.py`: Pydantic models defining the structure of processed insights.
 - `observers/`: Scripts for observing the developer environment (e.g., Git post-commit hook).
 
 ## Usage
@@ -41,7 +42,15 @@ This project uses `uv` for package management.
 uv pip install -e .
 ```
 
-### 2. Run Local Infrastructure
+### 2. Set Up Environment Variables
+Create a `.env` file in the root of the `cortex_mentor` directory and add your API keys:
+```
+UPSTASH_URL="your_upstash_vector_db_url"
+UPSTASH_TOKEN="your_upstash_vector_db_token"
+GEMINI_API_KEY="your_google_ai_studio_api_key"
+```
+
+### 3. Run Local Infrastructure
 In separate terminals, start the required services:
 
 **Terminal 1: Start Redis**
@@ -60,32 +69,23 @@ ollama pull nomic-embed-text:v1.5
 ollama pull llava-llama3:latest
 ```
 
+### 4. Run the Backend
+The backend consists of two main processes: the API server and the background worker.
+
 **Terminal 3: Start the ARQ Worker**
+This process listens for and executes background jobs like processing events and synthesizing insights.
 ```zsh
 uv run arq src.cortex.workers.WorkerSettings
 ```
 
-### 3. Run the FastAPI Server
-
-**Terminal 4: Start the API Gateway**
+**Terminal 4: Start the FastAPI Server**
+This process handles incoming API requests and manages the WebSocket connections for real-time delivery.
 ```zsh
 uv run uvicorn src.cortex.main:app --reload
 ```
 
-### 4. Configure and Trigger an Event
-
-**Terminal 5: Configure and make a git commit**
-First, tell the git hook where the API is running:
-```zsh
-git config --local cortex.api-url "http://127.0.0.1:8000/api/events"
-```
-Now, make a commit to trigger the pipeline:
-```zsh
-touch test_file.txt
-git add .
-git commit -m "Test: Triggering the Cortex observer pipeline"
-```
-Watch the ARQ worker and Uvicorn terminals for activity.
+### 5. Run the Frontend
+See the `README.md` file in the `cortex-vs` directory for instructions on how to run the VS Code extension.
 
 ---
 For more architectural details, see the documentation in `docs/`.
