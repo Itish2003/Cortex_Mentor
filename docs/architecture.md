@@ -296,6 +296,7 @@ graph TD
         B -- "initial_data(D1)" --> P2
         P1 -- "output(D2_Private)" --> P3
         P2 -- "output(D2_Public)" --> P3
+        P3 -- "output(Dict)" --> P4
     end
 ```
 

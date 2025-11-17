@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_flash_model: str = "gemini-2.5-flash"
     gemini_pro_model: str = "gemini-2.5-pro"
+    tts_voice_name: str = "en-US-Neural2-C" 
 
 
     class Config:

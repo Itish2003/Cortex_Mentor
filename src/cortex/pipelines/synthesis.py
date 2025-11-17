@@ -17,6 +17,8 @@ from cortex.utility.agent_runner import run_standalone_agent
 from cortex.pipelines.pipelines import Pipeline
 from cortex.core.config import Settings
 from cortex.pipelines.graph_traversal import GraphTraversalProcessor
+from cortex.pipelines.delivery import AudioDeliveryProcessor
+from redis.asyncio import Redis
 
 class RunPrivatePipeline(Processor):
     def __init__(self, chroma_service: ChromaService, settings: Settings):
@@ -41,7 +43,7 @@ class RunPublicPipeline(Processor):
         public_results = await self.pipeline.execute(data, context)
         return {"public_knowledge": public_results}
 
-def create_synthesis_pipeline(chroma_service: ChromaService, upstash_service: UpstashService, llm_service: LLMService) -> Pipeline:
+def create_synthesis_pipeline(chroma_service: ChromaService, upstash_service: UpstashService, llm_service: LLMService, redis: Redis) -> Pipeline:
     settings = Settings()
     return Pipeline([
         # Running these in parallel
@@ -50,6 +52,7 @@ def create_synthesis_pipeline(chroma_service: ChromaService, upstash_service: Up
             RunPublicPipeline(upstash_service, llm_service),
         ],
         InsightSynthesizer(llm_service),
+        AudioDeliveryProcessor(redis),
     ])
 
 class PrivateKnowledgeQuerier(Processor):

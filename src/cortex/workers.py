@@ -83,7 +83,7 @@ async def synthesis_task(ctx, query_text: str):
     llm_service = LLMService()
 
     # 2. Define the pipeline.
-    synthesis_pipeline = create_synthesis_pipeline(chroma_service, upstash_service, llm_service)
+    synthesis_pipeline = create_synthesis_pipeline(chroma_service, upstash_service, llm_service, ctx.get("redis"))
 
     context = {
         "redis": ctx.get("redis"),
