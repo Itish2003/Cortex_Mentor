@@ -5,6 +5,10 @@ from pathlib import Path
 from ..models.insights import Insight
 from ..models.events import GitCommitEvent, CodeChangeEvent
 from ..core.config import Settings
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class KnowledgeGraphService:
     """
@@ -92,4 +96,4 @@ class KnowledgeGraphService:
                 repo_node_path = self.base_path / "repositories" / f"{repo_name}.md"
                 self._update_index_node(repo_node_path, insight_file_path)
         
-        print(f"Knowledge graph updated. Created insight node: {insight_file_path.name}")
+        logger.info(f"Knowledge graph updated. Created insight node: {insight_file_path.name}")

@@ -1,8 +1,11 @@
 import requests
-from ..core.config import Settings
+from cortex.core.config import Settings
 from google import genai
 from typing import Optional
 from .prompt_manager import PromptManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 class LLMService:
     """
@@ -45,7 +48,7 @@ class LLMService:
                 return "".join([part.text for part in response.parts if part.text]).strip()
             return ""
         except Exception as e:
-            print(f"Error communicating with Gemini API: {e}")
+            logger.error(f"Error communicating with Gemini API: {e}")
             return f"No summary available due to Gemini API error: {e}"
 
     def _generate_with_ollama(self, prompt: str, model: str) -> str:
@@ -57,7 +60,7 @@ class LLMService:
             response.raise_for_status()
             return response.json().get("response", "").strip()
         except requests.RequestException as e:
-            print(f"Error communicating with local LLM API: {e}")
+            logger.error(f"Error communicating with local LLM API: {e}")
             return f"No summary available due to local LLM error: {e}"
 
     def generate_commit_summary(self, commit_message: str, commit_diff: str) -> str:

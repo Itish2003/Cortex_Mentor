@@ -36,10 +36,8 @@ def read_root():
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
-        while True:
-            # Keep the connection alive, or handle incoming messages if needed
-            # For now, we just expect the client to stay connected
-            await websocket.receive_text() 
+        # Keep the connection alive indefinitely
+        await asyncio.Future()
     except WebSocketDisconnect:
         manager.disconnect(websocket)
     except Exception as e:
@@ -55,8 +53,8 @@ async def redis_pubsub_listener(app: FastAPI):
         while True:
             message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
             if message and message["type"] == "message":
-                data = message["data"].decode("utf-8")
-                logger.info(f"Received message from Redis: {data}")
+                data = message["data"] # Keep as bytes
+                logger.info(f"Received message from Redis (type: {type(data)}). Broadcasting...")
                 await manager.broadcast(data)
             await asyncio.sleep(0.01)  # Small sleep to prevent busy-waiting
     except asyncio.CancelledError:

@@ -1,6 +1,9 @@
 
 from upstash_vector import AsyncIndex, Vector
 from cortex.core.config import Settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 class UpstashService:
     def __init__(self):
@@ -16,7 +19,7 @@ class UpstashService:
                 ]
             )
         except Exception as e:
-            print(f"[UpstashService] Error adding document {doc_id}: {e}")
+            logger.error(f"[UpstashService] Error adding document {doc_id}: {e}")
 
     async def query(self, query_text: str, n_results: int = 3):
         """Query the collection for similar documents, letting Upstash generate the embedding."""

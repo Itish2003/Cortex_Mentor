@@ -6,11 +6,11 @@ This document outlines the current implementation status of the Cortex Mentor pr
 
 The core architectural vision is to use a structured, interlinked Markdown knowledge graph (a "Zettelkasten") to build a precise, low-bloat context for the LLM, and to deliver synthesized insights back to the user in real-time as an audio stream.
 
-## The Reality: A Fully-Featured Backend with No Frontend
+## The Reality: A Complete End-to-End System
 
-The project has successfully implemented the entire end-to-end backend pipeline, from event ingestion to real-time audio delivery. The "brain" and the "voice" of the system are now complete. The only missing piece is the "ears" on the client side to receive and play the audio.
+The project has successfully implemented the entire end-to-end system, from event ingestion on the backend to real-time audio playback on the client. The "brain," the "voice," and the "ears" of the system are now complete and functional.
 
-### What We Are Doing Now (The Foundation)
+### What We Have Built (The Foundation)
 
 - ✅ **Dual-Write System**: The `ComprehensionPipeline` correctly performs a "dual write" to both the Markdown knowledge graph and the ChromaDB search index.
 - ✅ **Graph Traversal**: The `SynthesisPipeline` now uses a `GraphTraversalProcessor` to traverse the links within the Markdown files, gathering a rich, multi-hop context.
@@ -18,20 +18,29 @@ The project has successfully implemented the entire end-to-end backend pipeline,
 - ✅ **Parallel Processing**: The synthesis pipeline runs the private knowledge retrieval (including graph traversal) and the public knowledge retrieval (including curation) in parallel for improved performance.
 - ✅ **Real-time Audio Delivery**: The `AudioDeliveryProcessor` successfully converts the final text insight into audio using Google's Text-to-Speech API and publishes it to a Redis Pub/Sub channel.
 - ✅ **WebSocket Broadcasting**: The FastAPI server listens to the Redis channel and broadcasts the audio data to all connected WebSocket clients.
+- ✅ **VS Code Extension Client**: A fully functional client that connects to the backend, receives audio insights via WebSockets, and plays them to the user, providing a seamless, real-time experience.
 
-### The Gap: Where We Are Falling Short
+**In summary, we have built a complete, end-to-end system that can think, speak, and be heard.**
 
-- ❌ **No Client-Side Implementation**: While the backend is fully functional and broadcasting audio insights, there is no client-side application (e.g., a VS Code plugin) to connect to the WebSocket, receive the audio stream, and play it to the user.
+## Next Steps: Realising the Future Vision
 
-**In summary, we have built a complete, end-to-end backend system that can think and speak, but there is no one listening.**
+With the core vision now fully implemented, the next steps are to explore the "Future Vision" items outlined below. These enhancements will build upon our solid foundation to create a truly next-generation development tool.
 
-## Next Steps: Building the Ears
+## Future Vision: The Path to a Fully Realised Mentor
 
-To bridge this final gap and deliver value to the user, the next and final logical step is to build a client-side interface.
+With the core end-to-end functionality in place, the path is clear for evolving the Cortex Mentor into a truly next-generation development tool. Future enhancements could focus on the following areas:
 
-- **Proposed Enhancement**: Develop a client-side application (e.g., a VS Code extension).
-- **Logic**:
-    1.  The client will establish a persistent WebSocket connection to the backend server at `ws://localhost:8000/ws`.
-    2.  It will listen for incoming binary messages (the audio data).
-    3.  Upon receiving an audio message, it will use a local audio playback library to play the sound directly to the user, providing a real-time, voice-based insight.
-    4.  The client will also be responsible for sending events (e.g., from Git hooks) to the backend's HTTP endpoints to trigger the pipelines.
+-   **Deeper Comprehension & a True Knowledge Graph**:
+    -   Enhance the `InsightGenerator` to extract structured entities (functions, classes, dependencies) and relationships (modifies, imports, calls) from code events.
+    -   Use this structured data to build a true, property-based knowledge graph, enabling far more powerful and precise queries and traversals than the current document-link model.
+
+-   **Multi-Modal & Interactive Engagement**:
+    -   Move beyond "fire-and-forget" audio. Deliver insights as structured messages that the client can choose how to display (audio, text pop-up, status bar notification).
+    -   Allow users to interact with insights, such as replaying the audio, viewing the source text, or even asking a follow-up question to trigger a new synthesis cycle.
+
+-   **Production-Grade Observability & Robustness**:
+    -   Integrate structured logging, distributed tracing (e.g., OpenTelemetry), and metrics to provide deep insights into pipeline performance and system health.
+    -   Implement more sophisticated error handling in the task queue, such as dead-letter queues and configurable retry policies.
+
+-   **Broader Event Coverage**:
+    -   Expand the set of `observers` to capture a wider range of developer activities, such as terminal commands, file saves, debugger usage, and IDE state changes, to build an even richer understanding of the user's context.

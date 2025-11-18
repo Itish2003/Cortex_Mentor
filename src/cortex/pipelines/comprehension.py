@@ -41,7 +41,7 @@ class InsightGenerator(Processor):
 
         Args:
             data: A validated Pydantic event model (e.g., GitCommitEvent).
-            context: The shared context (not used for llm_service anymore).
+            context: The shared context, not used in this processor.
 
         Returns:
             A new Insight object.

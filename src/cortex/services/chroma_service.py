@@ -7,11 +7,12 @@ from typing import List
 class OllamaEmbeddingHelper:
     def __init__(self, model="nomic-embed-text:v1.5"):
         self.model = model
+        self.settings = Settings()
 
     def get_embedding(self, text: str) -> List[float]:
         """Generates a single embedding for a single piece of text."""
         response = requests.post(
-            "http://localhost:11434/api/embed",
+            self.settings.llm_embed_url,
             json={"model": self.model, "input": text}
         )
         response.raise_for_status()
