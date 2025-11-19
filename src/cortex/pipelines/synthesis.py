@@ -103,14 +103,7 @@ class KnowledgeGatewayProcessor(Processor):
     def __init__(self, llm_service: LLMService):
         self.llm_service = llm_service
         self.prompt_manager = PromptManager()
-        self.gateway_agent = LlmAgent(
-            name="knowledge_gateway_agent",
-            instruction=self.prompt_manager.render("knowledge_gateway.jinja2"),
-            output_schema=GatewayDecision,
-            model=llm_service.settings.gemini_flash_model,
-            disallow_transfer_to_parent=True,
-            disallow_transfer_to_peers=True,
-        )
+        # FIX: Removed self.gateway_agent instantiation from __init__ to prevent session state reuse
 
     async def process(self, data: dict, context: dict) -> dict:
         logger.info("Evaluating retrieved public knowledge...")
@@ -121,13 +114,24 @@ class KnowledgeGatewayProcessor(Processor):
         sanitized_results = [str(r).replace("/", " ").replace("\n", " ") for r in public_results]
         public_context = "\n".join(sanitized_results)
 
+        # FIX: Instantiate the agent here for every request to ensure a fresh session
+        gateway_agent = LlmAgent(
+            name="knowledge_gateway_agent",
+            instruction=self.prompt_manager.render("knowledge_gateway.jinja2"),
+            output_schema=GatewayDecision,
+            model=self.llm_service.settings.gemini_flash_model, # Use self.llm_service to access settings
+            disallow_transfer_to_parent=True,
+            disallow_transfer_to_peers=True,
+        )
+
         prompt = self.prompt_manager.render(
             "knowledge_gateway.jinja2",
             query_text=query_text,
             public_context=public_context
         )
         
-        evaluation_str = await run_standalone_agent(self.gateway_agent, prompt)
+        # Use the local gateway_agent instance
+        evaluation_str = await run_standalone_agent(gateway_agent, prompt)
         
         try:
             gateway_decision = GatewayDecision.model_validate_json(evaluation_str)

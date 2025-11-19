@@ -91,24 +91,25 @@ def create_curation_agent(upstash_service: UpstashService, llm_service: LLMServi
 
 class CurationProcessor(Processor):
     def __init__(self, upstash_service: UpstashService, llm_service: LLMService):
-        self.curation_agent = create_curation_agent(upstash_service, llm_service)
+        # FIX: Removed self.curation_agent instantiation from __init__
+        self.upstash_service = upstash_service
         self.llm_service = llm_service
 
     async def process(self, data: dict, context: dict) -> dict:
         query_text = data["query_text"]
         logger.info(f"Starting curation process for query: {query_text}")
 
+        # FIX: Create the complex agent hierarchy specific to this request
+        curation_agent = create_curation_agent(self.upstash_service, self.llm_service)
+
         # Run the full curation pipeline to get the final, synthesized result
         final_summary = await run_standalone_agent(
-            self.curation_agent,
+            curation_agent,
             query_text,
             target_agent_name="chief_editor"
         )
 
         # Immediately add the augmented knowledge to the data dictionary
         data["augmented_knowledge"] = final_summary
-
-        # The writing to the knowledge base is now handled by the chief_editor agent.
-        # We no longer need a separate background task here.
 
         return data
