@@ -66,7 +66,7 @@ Make sure the Ollama application is running. Then, pull the required models:
 ollama pull nomic-embed-text:v1.5
 
 # For summary generation
-ollama pull llava-llama3:latest
+ollama pull llava-llama3:latest 
 ```
 
 ### 4. Run the Backend
