@@ -65,9 +65,17 @@ class PrivateKnowledgeQuerier(Processor):
     async def process(self, data: str, context: dict) -> dict:
         logger.info("Querying private knowledge store (ChromaDB)...")
         private_results = self.chroma_service.query(data, n_results=2)
+        
+        file_paths = []
+        # Safely extract file paths from metadata
+        metadatas = private_results.get("metadatas")
+        if metadatas and len(metadatas) > 0 and metadatas[0] is not None:
+            file_paths = [meta.get("file_path") for meta in metadatas[0] if meta and meta.get("file_path")]
+
         return {
             "query_text": data,
-            "private_results": private_results
+            "private_results": private_results,
+            "entry_points": file_paths
         }
 
 class PublicKnowledgeQuerier(Processor):
@@ -100,13 +108,18 @@ class KnowledgeGatewayProcessor(Processor):
             instruction=self.prompt_manager.render("knowledge_gateway.jinja2"),
             output_schema=GatewayDecision,
             model=llm_service.settings.gemini_flash_model,
+            disallow_transfer_to_parent=True,
+            disallow_transfer_to_peers=True,
         )
 
     async def process(self, data: dict, context: dict) -> dict:
         logger.info("Evaluating retrieved public knowledge...")
         query_text = data["query_text"]
         public_results = data.get("public_results", [])
-        public_context = "\n".join([str(r) for r in public_results])
+        
+        # Sanitize the public knowledge before passing it to the prompt
+        sanitized_results = [str(r).replace("/", " ").replace("\n", " ") for r in public_results]
+        public_context = "\n".join(sanitized_results)
 
         prompt = self.prompt_manager.render(
             "knowledge_gateway.jinja2",

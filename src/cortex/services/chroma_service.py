@@ -50,6 +50,7 @@ class ChromaService:
         query_embedding = self.embedding_helper.get_embedding(query_text)
         results = self.collection.query(
             query_embeddings=[query_embedding],
-            n_results=n_results
+            n_results=n_results,
+            include=["documents", "metadatas"]
         )
         return results

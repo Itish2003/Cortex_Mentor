@@ -2,6 +2,7 @@ from google.adk.agents import BaseAgent
 from google.adk.runners import InMemoryRunner
 from google.genai import types
 from typing import Optional
+import uuid
 
 async def run_standalone_agent(
     agent: BaseAgent,
@@ -13,10 +14,11 @@ async def run_standalone_agent(
     If target_agent_name is provided, it returns the final text result of that specific agent.
     """
     runner = InMemoryRunner(agent=agent)
+    session_id = str(uuid.uuid4())
     result_text = ""
     async for event in runner.run_async(
         user_id="user",
-        session_id="session",
+        session_id=session_id,
         new_message=types.Content(parts=[types.Part(text=prompt)]),
     ):
         if event.is_final_response() and event.content and event.content.parts:

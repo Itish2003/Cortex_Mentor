@@ -16,19 +16,20 @@ class GraphTraversalProcessor(Processor):
 
     async def process(self, data: dict, context: dict) -> dict:
         logger.info("Traversing knowledge graph...")
-        private_results = data.get("private_results", {})
-        documents = private_results.get("documents", [[]])
-        if not documents or not documents[0]:
-            logger.info("No private results to traverse.")
+        entry_points = data.get("entry_points", [])
+        if not entry_points:
+            logger.info("No entry points found for graph traversal.")
             data["traversed_knowledge"] = ""
             return data
 
-        entry_points = documents[0]
         traversed_content = []
         visited = set()
 
         for entry_point in entry_points:
-            # The entry point from ChromaDB is a full path, we need the relative path
+            if not entry_point:
+                continue
+            # The entry point from ChromaDB metadata should be an absolute path.
+            # We need the relative path for our traversal logic.
             relative_path = os.path.relpath(entry_point, self.knowledge_graph_root)
             traversed_content.append(self._traverse(relative_path, visited))
 
