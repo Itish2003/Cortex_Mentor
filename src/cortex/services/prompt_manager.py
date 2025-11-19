@@ -1,16 +1,19 @@
 from jinja2 import Environment, FileSystemLoader
-import os
 from pathlib import Path
+import logging
+
+logger = logging.getLogger(__name__)
 
 class PromptManager:
     """
     Manages loading and rendering Jinja2 templates for prompts.
     """
-    def __init__(self, template_folder: str = "prompts"):
-        # Construct an absolute path to the templates directory
-        current_dir = Path(__file__).parent
-        absolute_template_path = current_dir.parent.parent / template_folder
-        self.env = Environment(loader=FileSystemLoader(absolute_template_path))
+    def __init__(self):
+        # Construct an absolute path to the 'prompts' directory from the project root
+        project_root = Path(__file__).parent.parent.parent
+        template_folder = project_root / "src/cortex/prompts"
+        logger.info(f"Attempting to load templates from: {template_folder.resolve()}")
+        self.env = Environment(loader=FileSystemLoader(str(template_folder)))
 
     def render(self, template_name: str, **kwargs) -> str:
         """
