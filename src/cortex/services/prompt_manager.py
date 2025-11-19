@@ -11,7 +11,7 @@ class PromptManager:
     def __init__(self):
         # Construct an absolute path to the 'prompts' directory from the project root
         project_root = Path(__file__).parent.parent.parent
-        template_folder = project_root / "src/cortex/prompts"
+        template_folder = project_root / "cortex/prompts"
         logger.info(f"Attempting to load templates from: {template_folder.resolve()}")
         self.env = Environment(loader=FileSystemLoader(str(template_folder)))
 
