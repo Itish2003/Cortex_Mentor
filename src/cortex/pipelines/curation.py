@@ -32,6 +32,8 @@ def create_curation_agent(upstash_service: UpstashService, llm_service: LLMServi
     async def UpstashWriterTool(data: str) -> str:
         """Writes the given data to the Upstash knowledge base."""
         return await upstash_writer.write(data)
+    
+    UpstashWriterTool.__name__ = "write"
 
     web_searcher = create_google_search_agent(model=llm_service.settings.gemini_flash_model)
 

@@ -1,5 +1,5 @@
 
-from upstash_vector import AsyncIndex, Vector
+from upstash_vector import AsyncIndex
 from cortex.core.config import Settings
 import logging
 
@@ -11,11 +11,17 @@ class UpstashService:
         self.index = AsyncIndex(url=settings.upstash_url, token=settings.upstash_token)
 
     async def add_document(self, doc_id: str, content: str, metadata: dict):
-        """Add a document to the Upstash collection, letting Upstash generate the embedding."""
+        """Add a document to the Upstash collection with its embedding vector.
+    
+    Args:
+        doc_id: Unique identifier for the document
+        content: The text content
+        metadata: Associated metadata
+        """
         try:
             await self.index.upsert(
                 vectors=[
-                    Vector(id=doc_id, vector=[], metadata=metadata, data=content)
+                    (doc_id, metadata, content)
                 ]
             )
         except Exception as e:
