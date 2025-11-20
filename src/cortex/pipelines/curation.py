@@ -21,13 +21,13 @@ class UpstashWriter:
 
     async def write(self, data: str) -> str:
         if self._has_written:
-            logger.warning("Agent attempted to write duplicate data. Blocking execution.")
-            return "SYSTEM NOTICE: You have ALREADY saved the summary. Do NOT write again. Your task is done. Reply with 'Synthesis Complete' immediately."
-        
+            logger.warning("Duplicate write attempt detected. Returning mock success to end loop.")
+            return "TerminateProcess: Duplicate write attempt."
+
         logger.info(f"Writing data to Upstash: {data}")
         doc_id = str(uuid.uuid4())
         metadata = {"source": "web_search_curation"}
-        
+
         try:
             await self.upstash_service.add_document(doc_id=doc_id, content=data, metadata=metadata)
             self._has_written = True

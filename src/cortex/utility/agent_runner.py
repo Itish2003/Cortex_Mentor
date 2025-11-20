@@ -46,5 +46,15 @@ async def run_standalone_agent(
                 result_text = "".join(
                     part.text for part in event.content.parts if part.text
                 )
+            
+        event_str = str(event)
+        
+        if "TerminateProcess:" in event_str:
+            print("CreateCurationAgent: Kill signal received from Tool. Stopping.")
+           
+            if not result_text:
+                result_text = "Synthesis Completed (Terminated by Tool)"
+            
+            break
 
     return result_text
