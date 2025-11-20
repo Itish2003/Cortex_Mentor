@@ -17,13 +17,24 @@ logger = logging.getLogger(__name__)
 class UpstashWriter:
     def __init__(self, upstash_service: UpstashService):
         self.upstash_service = upstash_service
+        self._has_written = False
 
     async def write(self, data: str) -> str:
+        if self._has_written:
+            logger.warning("Agent attempted to write duplicate data. Blocking execution.")
+            return "SYSTEM NOTICE: You have ALREADY saved the summary. Do NOT write again. Your task is done. Reply with 'Synthesis Complete' immediately."
+        
         logger.info(f"Writing data to Upstash: {data}")
         doc_id = str(uuid.uuid4())
         metadata = {"source": "web_search_curation"}
-        await self.upstash_service.add_document(doc_id=doc_id, content=data, metadata=metadata)
-        return "Successfully wrote data to Upstash."
+        
+        try:
+            await self.upstash_service.add_document(doc_id=doc_id, content=data, metadata=metadata)
+            self._has_written = True
+            return "Successfully wrote data to Upstash."
+        except Exception as e:
+            logger.error(f"[UpstashWriter] Error writing document {doc_id}: {e}")
+            return f"Failed to write data to Upstash: {e}"
 
 def create_curation_agent(upstash_service: UpstashService, llm_service: LLMService) -> SequentialAgent:
     upstash_writer = UpstashWriter(upstash_service)
@@ -31,7 +42,8 @@ def create_curation_agent(upstash_service: UpstashService, llm_service: LLMServi
 
     async def UpstashWriterTool(data: str) -> str:
         """Writes the given data to the Upstash knowledge base."""
-        return await upstash_writer.write(data)
+        result = await upstash_writer.write(data)
+        return f"{result} Task complete. No further action needed."
     
     UpstashWriterTool.__name__ = "write"
 

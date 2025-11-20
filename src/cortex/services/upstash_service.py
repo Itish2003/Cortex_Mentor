@@ -1,5 +1,6 @@
 
 from upstash_vector import AsyncIndex
+from upstash_vector.types import Data
 from cortex.core.config import Settings
 import logging
 
@@ -21,7 +22,7 @@ class UpstashService:
         try:
             await self.index.upsert(
                 vectors=[
-                    (doc_id, metadata, content)
+                    Data(id=doc_id, metadata=metadata, data=content)
                 ]
             )
         except Exception as e:
