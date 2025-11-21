@@ -27,7 +27,7 @@ class EventDeserializer(Processor):
         
         logger.info(f"Deserialized event of type: {event_type}")
         return event
-    
+     
 class InsightGenerator(Processor):
     """
     Generates a structured Insight from a source event by calling an LLM.
