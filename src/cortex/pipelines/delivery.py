@@ -4,6 +4,8 @@ import logging
 from redis.asyncio import Redis
 from google.cloud import texttospeech
 from cortex.core.config import Settings
+import base64
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +45,17 @@ class AudioDeliveryProcessor(Processor):
 
             if audio_data:
                 logger.info("Publishing audio data to Redis 'insights_channel'...")
-                await self.redis.publish("insights_channel", audio_data)
+                
+                # Encode audio to base64 string
+                audio_b64 = base64.b64encode(audio_data).decode('utf-8')
+                
+                message = {
+                    "type": "insight",
+                    "text": final_insight,
+                    "audio": audio_b64
+                }
+                
+                await self.redis.publish("insights_channel", json.dumps(message))
                 logger.info("Audio data published successfully.")
             else:
                 logger.warning("Google Cloud Text-to-Speech returned no audio data.")
