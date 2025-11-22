@@ -32,7 +32,7 @@ class AudioDeliveryProcessor(Processor):
                 name=self.settings.tts_voice_name
             )
             audio_config = texttospeech.AudioConfig(
-                audio_encoding=texttospeech.AudioEncoding.LINEAR16
+                audio_encoding=texttospeech.AudioEncoding.MP3
             )
 
             response = self.tts_client.synthesize_speech(
