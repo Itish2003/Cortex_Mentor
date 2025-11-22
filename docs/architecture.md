@@ -341,7 +341,7 @@ graph TD
     *   `SynthesisTrigger`: Enqueues a new job for the next pipeline (e.g., the Synthesis Pipeline).
 3.  **Data Flow**: The output of each processor becomes the input for the next, allowing data to be progressively enriched and transformed as it moves through the pipeline.
 
-## 8. Real-time Audio Insight Delivery
+## 8. Real-time Multi-Modal Insight Delivery
 
 This diagram details the final stage of the process: delivering the synthesized insight to the user as a real-time audio stream. This flow decouples the background processing from the client-facing web server using a Redis Pub/Sub message bus.
 
@@ -386,10 +386,10 @@ graph TD
 ### Flow Description:
 
 1.  **Final Insight**: The `Synthesis Pipeline` completes its work, producing a final, human-readable insight as a string of text.
-2.  **Audio Generation**: This text is passed to the `AudioDeliveryProcessor`. This processor makes an API call to the **Google Gemini TTS service** to convert the text into high-quality audio data.
-3.  **Return Audio**: The Gemini TTS service returns the generated audio.
-4.  **Publish to Redis**: The `AudioDeliveryProcessor` takes the audio data and publishes it as a message to a specific Redis Pub/Sub channel, named `insights_channel`. This action is fire-and-forget; the worker's job is done.
-5.  **Receive Message**: The main FastAPI web server process has a long-running task (a `WebSocketManager`) that is subscribed to the `insights_channel`. It immediately receives the audio data message.
-6.  **Broadcast to Clients**: The `WebSocketManager` iterates through all active WebSocket connections it is managing and broadcasts the audio data to every connected client.
-7.  **Stream to UI**: The client-side UI (e.g., a VS Code extension) receives the binary audio data through its WebSocket connection.
-8.  **Playback**: The UI uses a local audio player to play the audio stream, delivering the Cortex Mentor's insight to the user in real-time.
+2.  **Audio Generation**: This text is passed to the `AudioDeliveryProcessor`. This processor makes an API call to the **Google Gemini TTS service** to convert the text into high-quality MP3 audio data.
+3.  **Payload Construction**: The processor constructs a structured JSON object containing both the original **text insight** and the **Base64-encoded audio**.
+4.  **Publish to Redis**: The `AudioDeliveryProcessor` publishes this JSON payload to the `insights_channel` Redis Pub/Sub channel.
+5.  **Receive Message**: The FastAPI `WebSocketManager` receives the message.
+6.  **Broadcast to Clients**: The manager broadcasts the JSON payload to all connected clients.
+7.  **Render in UI**: The VS Code extension's **Chat View** parses the JSON. It displays the text in a chat bubble and creates an HTML5 audio player for the MP3 data.
+8.  **Playback & Persistence**: The UI plays the audio (auto-play) and persists the message in the chat history, allowing the user to read and replay the insight later.

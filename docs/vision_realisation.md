@@ -34,9 +34,8 @@ With the core end-to-end functionality in place, the path is clear for evolving 
     -   Enhance the `InsightGenerator` to extract structured entities (functions, classes, dependencies) and relationships (modifies, imports, calls) from code events.
     -   Use this structured data to build a true, property-based knowledge graph, enabling far more powerful and precise queries and traversals than the current document-link model.
 
--   **Multi-Modal & Interactive Engagement**:
-    -   Move beyond "fire-and-forget" audio. Deliver insights as structured messages that the client can choose how to display (audio, text pop-up, status bar notification).
-    -   Allow users to interact with insights, such as replaying the audio, viewing the source text, or even asking a follow-up question to trigger a new synthesis cycle.
+- ✅ **Multi-Modal Engagement (Chat UI)**: We have moved beyond simple audio streams. The backend now delivers structured JSON insights containing both the text and the MP3 audio. The VS Code extension renders these in a rich Chat Interface with persistent history, avatars, and interactive playback controls.
+- ✅ **Interactive Insights**: Users can now read the insight text, replay the audio at will, and view the conversation history, fulfilling the vision of a "Chat with your Mentor" experience.
 
 -   **Production-Grade Observability & Robustness**:
     -   Integrate structured logging, distributed tracing (e.g., OpenTelemetry), and metrics to provide deep insights into pipeline performance and system health.
