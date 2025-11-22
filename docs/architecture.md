@@ -1,4 +1,3 @@
-
 # Cortex Mentor Architecture
 
 This document outlines the architecture of the Cortex Mentor application, a system designed to analyze software development events and provide intelligent insights.
@@ -12,15 +11,15 @@ The core components are:
 - **Event-Driven API**: A FastAPI-based API receives events from observers like IDE plugins and Git hooks, and also manages WebSocket connections for real-time insight delivery.
 - **Asynchronous Task Queue**: ARQ and Redis manage background jobs for event processing, with workers publishing insights to Redis Pub/Sub for real-time delivery.
 - **Hybrid Knowledge Stores**:
-    - **Private User Model (Zettelkasten & Search Index)**: This is a dual-component system for storing user-specific data securely on the user's machine.
-        - **Markdown Files (Source of Truth)**: The `data/knowledge_graph/` directory contains interlinked markdown files that form the primary, human-readable, and persistent memory of the mentor's understanding of the user (the "Zettelkasten").
-        - **ChromaDB (Search Index)**: A local ChromaDB instance acts as a performance layer, storing vector embeddings of the markdown content. It serves as a high-speed, machine-readable search index, with metadata pointing back to the source markdown files.
-    - **Public MCP Knowledge Base**: A cloud-based Upstash Context platform containing curated, high-quality software development knowledge.
+  - **Private User Model (Zettelkasten & Search Index)**: This is a dual-component system for storing user-specific data securely on the user's machine.
+    - **Markdown Files (Source of Truth)**: The `data/knowledge_graph/` directory contains interlinked markdown files that form the primary, human-readable, and persistent memory of the mentor's understanding of the user (the "Zettelkasten").
+    - **ChromaDB (Search Index)**: A local ChromaDB instance acts as a performance layer, storing vector embeddings of the markdown content. It serves as a high-speed, machine-readable search index, with metadata pointing back to the source markdown files.
+  - **Public MCP Knowledge Base**: A cloud-based Upstash Context platform containing curated, high-quality software development knowledge.
 - **AI Agent Fleet**:
-    - **Level 1 (Comprehension)**: Processes raw events and stores insights in the private user model.
-    - **Level 2 (Synthesis)**: Combines insights from both the private user model and the public MCP knowledge base to provide expert advice.
-    - **Level 3 (Engagement)**: An `AudioDeliveryProcessor` that uses Gemini TTS to convert synthesized insights into audio and delivers them in real-time.
-    - **Corpus Curator**: A background agent responsible for populating and maintaining the public MCP knowledge base.
+  - **Level 1 (Comprehension)**: Processes raw events and stores insights in the private user model.
+  - **Level 2 (Synthesis)**: Combines insights from both the private user model and the public MCP knowledge base to provide expert advice.
+  - **Level 3 (Engagement)**: An `AudioDeliveryProcessor` that uses Gemini TTS to convert synthesized insights into audio and delivers them in real-time.
+  - **Corpus Curator**: A background agent responsible for populating and maintaining the public MCP knowledge base.
 - **Observers**: A collection of local tools that monitor file changes, Git hooks, and IDE events.
 - **Real-time Communication**: WebSockets for client-server communication and Redis Pub/Sub as a message bus between background workers and the FastAPI server.
 - **AI Services**: Integration with Google Gemini models, including Gemini TTS for advanced audio synthesis.
@@ -39,7 +38,7 @@ graph TD
             B[Git Hooks]
             C[CLI Wrapper]
         end
-        
+
         subgraph "Private RAG System (User Model)"
             F["<b style='font-size:14px'>Markdown Knowledge Graph</b><br/><i>(The Human-Readable Source)</i>"]
             G["<b>Local ChromaDB</b><br/><i>(The Searchable Index)</i>"]
@@ -55,14 +54,14 @@ graph TD
             D2[Redis Pub/Sub]
             E["<b>ARQ Task Queue</b><br/><i>(Managed by Redis)</i>"]
         end
-        
+
         subgraph "Agent Fleet (Persistent ARQ Workers)"
             AGENT_L1["<b>L1: Comprehension Agent</b><br/><i>Analyzes Raw Events</i>"]
             AGENT_L2["<b>L2: Synthesis & Strategy Agent</b><br/><i>Forms Opinions & Plans</i>"]
             AGENT_L3["<b>L3: Engagement</b><br/><i>(AudioDeliveryProcessor)</i>"]
             AGENT_CURATOR["<b>Corpus Curator Agent</b><br/><i>(Background Librarian)</i>"]
         end
-        
+
         subgraph "Public RAG System (MCP)"
             I["<b>Upstash Context Platform</b><br/><i>The Expert Knowledge Library</i>"]
             J[Gemini TTS]
@@ -91,19 +90,19 @@ graph TD
     B -- "1. Raw Event" --> D
     C -- "1. Raw Event" --> D
     D -- "2. Enqueues Job" --> E
-    
+
     %% ---> Flow 2: Level 1 Comprehension (Building the User Model)
     E -- "3. Dispatches Job" --> AGENT_L1
     AGENT_L1 -- "4a. Writes to<br/>Human-Readable Source" --> F
     AGENT_L1 -- "4b. Updates<br/>Searchable Index" --> G
     G -- "Embedded via" --> H
-    
+
     %% ---> Flow 3: Level 2 Synthesis (The "Thinking" Step)
     AGENT_L1 -- "5. Enqueues<br/>Synthesis Task" --> E
     E -- "6. Dispatches Job" --> AGENT_L2
     AGENT_L2 -- "7a. Queries / Gets Results" --- G
     AGENT_L2 -- "7b. Queries / Gets Results" --- I
-    
+
     %% ---> Flow 4: Level 3 Engagement (Delivering Guidance)
     AGENT_L2 -- "8. Enqueues<br/>Delivery Task" --> E
     E -- "9. Dispatches Job" --> AGENT_L3
@@ -112,7 +111,7 @@ graph TD
     D -- "12. Broadcasts Audio via" --> D1
     D1 -- "13. Delivers to" --> A
     A -- "14. Presents to" --> User
-    
+
     %% ---> Flow 5: Knowledge Curation (Parallel Background Process)
     AGENT_CURATOR -- "Curates & Populates<br/>the Mentor's Library" --> I
 ```
@@ -126,8 +125,9 @@ The application is designed for containerized deployment using Docker, ensuring 
 - **Asynchronous Task Queue (ARQ & Redis)**: ARQ is used for its simplicity, high performance, and native `asyncio` support. It manages background tasks like event processing and knowledge curation. Redis acts as the message broker for ARQ, providing a robust and scalable foundation for the task queue.
 
 - **Private Knowledge Store (ChromaDB & Ollama)**:
-    - **ChromaDB**: A local, persistent ChromaDB instance is used as the vector store for the private user model. It was chosen for its ease of use, file-based storage, and efficient semantic search capabilities, making it ideal for running on a user's local machine.
-    - **Ollama**: Ollama provides local access to large language models (like `nomic-embed-text`) for generating text embeddings. This allows all user data and embeddings to remain entirely on the user's machine, ensuring maximum privacy.
+
+  - **ChromaDB**: A local, persistent ChromaDB instance is used as the vector store for the private user model. It was chosen for its ease of use, file-based storage, and efficient semantic search capabilities, making it ideal for running on a user's local machine.
+  - **Ollama**: Ollama provides local access to large language models (like `nomic-embed-text`) for generating text embeddings. This allows all user data and embeddings to remain entirely on the user's machine, ensuring maximum privacy.
 
 - **Public Knowledge Store (Upstash)**: Upstash is a serverless data platform that provides a managed vector database. It was chosen for the public MCP Knowledge Base due to its scalability, ease of use, and pay-as-you-go pricing, making it a cost-effective solution for storing and querying curated, expert knowledge.
 
@@ -145,25 +145,28 @@ The application's code is organized into a modular structure within the `src/cor
 
 - **`api/events.py`**: Defines the API endpoints for receiving events. It handles incoming HTTP requests, validates the event data using Pydantic models, and enqueues the events as jobs in the ARQ task queue.
 
-    - **`workers.py`**: Configures the ARQ worker settings. It defines the tasks that the workers can execute (e.g., `process_event_task`, `synthesis_task`) and maps them to specific queues (e.g., `high_priority`, `low_priority`).
+  - **`workers.py`**: Configures the ARQ worker settings. It defines the tasks that the workers can execute (e.g., `process_event_task`, `synthesis_task`) and maps them to specific queues (e.g., `high_priority`, `low_priority`).
+
 - **`core/`**: Contains the core application logic and configuration.
-    - `config.py`: Manages application settings using Pydantic's `BaseSettings`, allowing for configuration via environment variables.
-    - `redis.py`: Handles the creation and lifecycle of the Redis connection pool for the ARQ task queue.
-    - `ws_connection_manager.py`: A utility to manage active WebSocket connections.
+
+  - `config.py`: Manages application settings using Pydantic's `BaseSettings`, allowing for configuration via environment variables.
+  - `redis.py`: Handles the creation and lifecycle of the Redis connection pool for the ARQ task queue.
+  - `ws_connection_manager.py`: A utility to manage active WebSocket connections.
 
 - **`models/`**: Defines the Pydantic models for the event data structures, ensuring that all incoming data is well-formed and validated.
 
 - **`services/`**: Contains the service classes that provide an abstraction layer for interacting with external data stores and APIs.
-    - `chroma_service.py`: Manages all interactions with the local ChromaDB instance, including adding documents and querying for similar insights.
-    - `upstash_service.py`: Manages all interactions with the Upstash Vector DB, handling the public MCP Knowledge Base.
-    - `llmservice.py`: Provides a unified interface for interacting with different LLMs (Ollama, Gemini).
-    - `prompt_manager.py`: Manages the loading and rendering of Jinja2 prompt templates.
+
+  - `chroma_service.py`: Manages all interactions with the local ChromaDB instance, including adding documents and querying for similar insights.
+  - `upstash_service.py`: Manages all interactions with the Upstash Vector DB, handling the public MCP Knowledge Base.
+  - `llmservice.py`: Provides a unified interface for interacting with different LLMs (Ollama, Gemini).
+  - `prompt_manager.py`: Manages the loading and rendering of Jinja2 prompt templates.
 
 - **`pipelines/`**: Contains the modular Pipeline & Processor architecture.
-    - `comprehension.py`: Defines the pipeline for processing raw events into insights.
-    - `synthesis.py`: Defines the pipeline for synthesizing knowledge from multiple sources.
-    - `curation.py`: Defines the multi-agent pipeline for augmenting public knowledge.
-    - `delivery.py`: Defines the final pipeline step for delivering the insight to the user.
+  - `comprehension.py`: Defines the pipeline for processing raw events into insights.
+  - `synthesis.py`: Defines the pipeline for synthesizing knowledge from multiple sources.
+  - `curation.py`: Defines the multi-agent pipeline for augmenting public knowledge.
+  - `delivery.py`: Defines the final pipeline step for delivering the insight to the user.
 
 ## 7. Current Operational Flow (Pipeline-based)
 
@@ -334,11 +337,11 @@ graph TD
 
 1.  **Execution**: An ARQ task receives the raw event data and constructs a `Pipeline` composed of specific processors.
 2.  **Processing**: The pipeline executes the processors in sequence:
-    *   `EventDeserializer`: Parses the raw dictionary into a validated Pydantic `Event` model.
-    *   `InsightGenerator`: Takes the `Event` model, calls the `LLMService`, and produces a structured `Insight` object.
-    *   `KnowledgeGraphWriter`: Appends the human-readable insight to the Markdown knowledge graph.
-    *   `ChromaWriter`: Adds the machine-readable embedding to the ChromaDB index.
-    *   `SynthesisTrigger`: Enqueues a new job for the next pipeline (e.g., the Synthesis Pipeline).
+    - `EventDeserializer`: Parses the raw dictionary into a validated Pydantic `Event` model.
+    - `InsightGenerator`: Takes the `Event` model, calls the `LLMService`, and produces a structured `Insight` object.
+    - `KnowledgeGraphWriter`: Appends the human-readable insight to the Markdown knowledge graph.
+    - `ChromaWriter`: Adds the machine-readable embedding to the ChromaDB index.
+    - `SynthesisTrigger`: Enqueues a new job for the next pipeline (e.g., the Synthesis Pipeline).
 3.  **Data Flow**: The output of each processor becomes the input for the next, allowing data to be progressively enriched and transformed as it moves through the pipeline.
 
 ## 8. Real-time Multi-Modal Insight Delivery
@@ -351,7 +354,7 @@ graph TD
         A["<b>Synthesis Pipeline</b><br/>(Final Stage)"]
         P4[AudioDeliveryProcessor]
         TTS[Gemini TTS API]
-        
+
         A -- "1. Final Insight (Text)" --> P4
         P4 -- "2. Generates Audio" --> TTS
         TTS -- "3. Returns Audio Data" --> P4
@@ -365,14 +368,14 @@ graph TD
     subgraph "FastAPI Server (Web Process)"
         WSS["<b>WebSocket Manager</b><br/>(Listens to Redis)"]
         WSC(Active WebSocket<br/>Connections)
-        
+
         R -- "5. Receives Message" --> WSS
         WSS -- "6. Broadcasts Audio Data" --> WSC
     end
 
     subgraph "User's Local Machine"
         UI[IDE Plugin / Client UI]
-        
+
         WSC -- "7. Streams Audio" --> UI
         UI -- "8. Plays Audio" --> User([User])
     end
