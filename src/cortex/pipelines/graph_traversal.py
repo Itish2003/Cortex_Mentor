@@ -36,7 +36,7 @@ class GraphTraversalProcessor(Processor):
         data["traversed_knowledge"] = "\n".join(traversed_content)
         return data
 
-    def _traverse(self, file_path: str, visited: set) -> str:
+    def _traverse(self, file_path: str, visited: set, context: dict) -> str:
         if file_path in visited:
             return ""
 
@@ -48,6 +48,7 @@ class GraphTraversalProcessor(Processor):
                 content = f.read()
         except FileNotFoundError:
             logger.warning(f"File not found during graph traversal: {full_path}")
+            context.setdefault("broken_links", []).append(full_path)
             return ""
 
         # Separate front matter from content

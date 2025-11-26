@@ -5,6 +5,7 @@ from cortex.models.insights import Insight
 from cortex.services.llmservice import LLMService
 from cortex.services.knowledge_graph_service import KnowledgeGraphService
 from cortex.services.chroma_service import ChromaService
+from cortex.exceptions import ProcessorError
 import logging
 from uuid import uuid4
 logging.basicConfig(level=logging.INFO)
@@ -111,9 +112,13 @@ class KnowledgeGraphWriter(Processor):
         self.kg_service = kg_service
 
     async def process(self, data: Insight, context: dict) -> None:
-        logger.info(f"Writing insight {data.insight_id} to knowledge graph.")
-        self.kg_service.process_insight(data)
-        logger.info(f"Insight {data.insight_id} written to knowledge graph.")
+        try: 
+            logger.info(f"Writing insight {data.insight_id} to knowledge graph.")
+            self.kg_service.process_insight(data)
+            logger.info(f"Insight {data.insight_id} written to knowledge graph.")
+        except Exception as e:
+            logger.error(f"Failed to write insight {data.insight_id}: {e}", exc_info=True)
+            raise ProcessorError(f"KnowledgeGraphWriter failed: {e}") from e
         return None
     
 class ChromaWriter(Processor):
@@ -124,26 +129,35 @@ class ChromaWriter(Processor):
         self.chroma_service = chroma_service
 
     async def process(self, data: Insight, context: dict) -> None:
-        logger.info(f"Adding insight {data.insight_id} to ChromaDB.")
-        self.chroma_service.add_document(
-            doc_id=data.insight_id,
-            content=data.content_for_embedding,
-            metadata=data.metadata
-        )
-        logger.info(f"Insight {data.insight_id} added to ChromaDB.")
-        return None
+        try: 
+            logger.info(f"Adding insight {data.insight_id} to ChromaDB.")
+            self.chroma_service.add_document(
+                doc_id=data.insight_id,
+                content=data.content_for_embedding,
+                metadata=data.metadata
+            )
+            logger.info(f"Insight {data.insight_id} added to ChromaDB.")
+            return None
+        except Exception as e:
+            logger.error(f"Failed to add insight {data.insight_id}: {e}", exc_info=True)
+            raise ProcessorError(f"ChromaWriter failed: {e}") from e
 
 class SynthesisTrigger(Processor):
     """
     Processor to trigger synthesis tasks based on the generated Insight.
     """
     async def process(self, data: Insight, context: dict) -> None:
-        logger.info(f"Triggering synthesis task for insight {data.insight_id}.")
-        redis = context.get("redis")
-        if data and redis:
-            logger.info(f"Enqueuing synthesis task for insight {data.insight_id}.")
-            await redis.enqueue_job('synthesis_task', data.content_for_embedding)
-        elif not redis:
-            logger.error("Redis pool not found in context for SynthesisTrigger.")
-        logger.info(f"Synthesis task triggered for insight {data.insight_id}.")
-        return None
+        try:
+            logger.info(f"Triggering synthesis task for insight {data.insight_id}.")
+            redis = context.get("redis")
+            if not redis:
+                logger.error("Redis pool not found in context for SynthesisTrigger.")
+                raise ProcessorError("Redis pool not found in context for SynthesisTrigger.")
+            if data:
+                logger.info(f"Enqueuing synthesis task for insight {data.insight_id}.")
+                await redis.enqueue_job('synthesis_task', data.content_for_embedding)
+                logger.info(f"Synthesis task triggered for insight {data.insight_id}.")
+                return None
+        except Exception as e:
+            logger.error(f"Failed to trigger synthesis task for insight {data.insight_id}: {e}", exc_info=True)
+            raise ProcessorError(f"SynthesisTrigger failed: {e}") from e
