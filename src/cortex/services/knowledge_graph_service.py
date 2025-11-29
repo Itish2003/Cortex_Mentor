@@ -5,6 +5,7 @@ from pathlib import Path
 from ..models.insights import Insight
 from ..models.events import GitCommitEvent, CodeChangeEvent
 from ..core.config import Settings
+from cortex.exceptions import ServiceError
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -59,14 +60,17 @@ class KnowledgeGraphService:
             "patterns":insight.patterns,
             "parent_nodes": [parent_repo_node] if parent_repo_node else []
         }
+        
+        try:
+            with open(insight_file, "w",encoding="utf-8") as f:
+                f.write("---\n")
+                yaml.dump(frontmatter, f, sort_keys=False)
+                f.write("---\n\n")
+                f.write(f"# Insight: {insight.summary}\n\n")
 
-        with open(insight_file, "w",encoding="utf-8") as f:
-            f.write("---\n")
-            yaml.dump(frontmatter, f, sort_keys=False)
-            f.write("---\n\n")
-            f.write(f"# Insight: {insight.summary}\n\n")
-
-        return insight_file
+            return insight_file
+        except Exception as e:
+            raise ServiceError(f"Error creating insight node: {e}")
     
     def _update_index_node(self, index_file: Path, link_to_add: Path):
         """
@@ -78,12 +82,15 @@ class KnowledgeGraphService:
         # os.path.relpath returns a string. We need to ensure it uses forward slashes for the markdown link.
         link_markdown = f"- [[{relative_link_path.replace(os.sep, '/')}]]\n"
 
-        if not index_file.exists():
-            with open(index_file, "w", encoding="utf-8") as f:
-                f.write(f"# Index: {index_file.stem}\n\n## Related Insights\n\n{link_markdown}")
-        else:
-            with open(index_file, "a", encoding="utf-8") as f:
-                f.write(link_markdown)
+        try:
+            if not index_file.exists():
+                with open(index_file, "w", encoding="utf-8") as f:
+                    f.write(f"# Index: {index_file.stem}\n\n## Related Insights\n\n{link_markdown}")
+            else:
+                with open(index_file, "a", encoding="utf-8") as f:
+                    f.write(link_markdown)
+        except Exception as e:
+            raise ServiceError(f"Error updating index node: {e}")
 
     def process_insight(self, insight: Insight):
         """

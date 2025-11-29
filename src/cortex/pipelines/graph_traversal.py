@@ -66,6 +66,6 @@ class GraphTraversalProcessor(Processor):
         for link in links:
             # Resolve the link relative to the current file's directory
             link_path = os.path.normpath(os.path.join(os.path.dirname(file_path), link))
-            traversed_content.append(self._traverse(link_path, visited))
+            traversed_content.append(self._traverse(link_path, visited, context))
 
         return "\n".join(traversed_content)
