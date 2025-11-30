@@ -1,426 +1,464 @@
-# Backend Patterns & Best Practices
+# Backend Patterns
 
-This document outlines the key patterns, conventions, and best practices used throughout the Cortex Mentor backend.
+## Pipeline & Processor Architecture
 
-## Core Architectural Patterns
+### Core Pattern
 
-### 1. Pipeline & Processor Pattern
+The entire backend is built on a **Pipeline & Processor** pattern that enables modular, testable, and composable data processing.
 
-**Purpose**: Modular, composable async processing with sequential and parallel execution.
+**Location**: `src/cortex/pipelines/`
 
-**Pattern Structure**:
+### Pipeline Class
+
+**File**: `src/cortex/pipelines/pipelines.py:9`
 
 ```python
-from abc import ABC, abstractmethod
-from typing import Any, List, Union
-
-class Processor(ABC):
-    """
-    Abstract base for all processors.
-    Each processor is a self-contained unit with a single responsibility.
-    """
-    @abstractmethod
-    async def process(self, data: Any, context: dict) -> Any:
-        """
-        Process input data and return transformed output.
-        
-        Args:
-            data: Input data (type depends on processor position in pipeline)
-            context: Shared resources (Redis, services, config)
-        
-        Returns:
-            Transformed data for next processor
-        """
-        pass
-
 class Pipeline:
-    """
-    Orchestrates sequential and parallel processor execution.
-    """
     def __init__(self, processors: List[Union[Processor, List[Processor]]]):
-        """
-        Args:
-            processors: List of processors or lists of processors.
-                        If element is a list, those processors run in parallel.
-        """
         self.processors = processors
     
-    async def run(self, initial_data: Any, context: dict) -> Any:
-        """
-        Execute pipeline with sequential/parallel processing.
-        """
-        data = initial_data
-        for stage in self.processors:
-            if isinstance(stage, list):
-                # Parallel execution
-                results = await asyncio.gather(
-                    *[p.process(data, context) for p in stage]
-                )
-                data = results[0] if results else data
-            else:
-                # Sequential execution
-                data = await stage.process(data, context)
-        return data
+    async def execute(self, data: Any, context: dict) -> Any:
+        # Executes processors sequentially
+        # Lists of processors execute in parallel
+        ...
 ```
 
-**Usage Example**:
+**Key Features**:
+- Sequential execution: Pass processors in a list
+- Parallel execution: Pass a list of lists `[[processor1, processor2]]`
+- Async-first design
+- Exception handling with logging
+- Context passing for shared resources
+
+### Processor Abstract Base Class
+
+**File**: `src/cortex/pipelines/processors.py:4`
 
 ```python
-# Sequential pipeline
-simple_pipeline = Pipeline([
-    EventDeserializer(),
-    InsightGenerator(llm_service),
-    ChromaWriter(chroma_service),
-])
-
-# Pipeline with parallel stage
-comprehension_pipeline = Pipeline([
-    EventDeserializer(),
-    InsightGenerator(llm_service),
-    [  # These run concurrently
-        KnowledgeGraphWriter(kg_service),
-        ChromaWriter(chroma_service),
-    ],
-    SynthesisTrigger(),
-])
-
-# Execute
-result = await pipeline.run(event_data, context)
+class Processor(ABC):
+    @abstractmethod
+    async def process(self, data: Any, context: dict) -> Any:
+        """Process input data and return result"""
+        pass
 ```
 
-**Why This Pattern**:
-- ✅ Single Responsibility: Each processor has one job
-- ✅ Composability: Mix and match processors easily
-- ✅ Testability: Test processors in isolation
-- ✅ Parallel Execution: Optimize I/O-bound operations
-- ✅ Reusability: Processors can be used in multiple pipelines
+**Design Principles**:
+1. **Dependency Injection**: Inject services via constructor, NOT context
+2. **Stateless Processing**: Each call should be independent
+3. **Async by Default**: All processors are async
+4. **Type Safety**: Use Pydantic models for data validation
+5. **Logging**: Log entry/exit and errors
 
-### 2. Dependency Injection
-
-**Pattern**: Inject services via constructor, not via context.
-
-**❌ Anti-pattern**:
+### Example: Creating a New Processor
 
 ```python
-class InsightGenerator(Processor):
-    async def process(self, data, context):
-        # BAD: Retrieving service from context
-        llm_service = context['llm_service']
-        result = llm_service.generate(data)
-        return result
-```
+# src/cortex/pipelines/my_processor.py
+from cortex.pipelines.processors import Processor
+from cortex.services.my_service import MyService
+import logging
 
-**✅ Recommended**:
+logger = logging.getLogger(__name__)
 
-```python
-class InsightGenerator(Processor):
-    def __init__(self, llm_service: LLMService):
-        # GOOD: Inject service via constructor
-        self.llm_service = llm_service
-    
-    async def process(self, data, context):
-        # Service is already available
-        result = self.llm_service.generate(data)
-        return result
-```
-
-**Why This Pattern**:
-- ✅ Type safety: Constructor parameters are typed
-- ✅ Explicit dependencies: Clear what each processor needs
-- ✅ Easier testing: Mock services in constructor
-- ✅ Better IDE support: Autocomplete works correctly
-
-**Context Usage**: Reserve `context` for runtime-only resources like Redis pool, not services.
-
-### 3. Service Layer Pattern
-
-**Pattern**: Encapsulate external integrations in service classes.
-
-**Service Structure**:
-
-```python
-from cortex.core.config import Settings
-
-class MyService:
+class MyProcessor(Processor):
     """
-    Service for integrating with external system.
+    Does something specific with data.
     """
-    def __init__(self, settings: Settings):
-        self.settings = settings
-        self.client = self._initialize_client()
+    def __init__(self, my_service: MyService):
+        # GOOD: Inject dependencies via constructor
+        self.my_service = my_service
     
-    def _initialize_client(self):
-        """Private method to set up client."""
-        return SomeClient(api_key=self.settings.api_key)
-    
-    async def query(self, input_text: str) -> dict:
-        """Public async method for queries."""
-        response = await self.client.query(input_text)
-        return self._parse_response(response)
-    
-    def _parse_response(self, response) -> dict:
-        """Private method to parse responses."""
-        return {"result": response.data}
-```
-
-**Why This Pattern**:
-- ✅ Separation of concerns: Business logic separated from integration details
-- ✅ Reusability: Services used across multiple processors
-- ✅ Testability: Mock services easily
-- ✅ Centralized configuration: Settings managed in one place
-
-**Examples in Codebase**:
-- `LLMService`: Ollama + Gemini integration
-- `ChromaService`: Vector database operations
-- `KnowledgeGraphService`: Markdown file management
-- `UpstashService`: Public knowledge queries
-
-### 4. Pydantic Models for Data Validation
-
-**Pattern**: Use Pydantic models for all data structures.
-
-**Event Models** (`src/cortex/models/events.py`):
-
-```python
-from pydantic import BaseModel, Field
-from datetime import datetime
-
-class SourceEvent(BaseModel):
-    """Base class for all events."""
-    event_type: str
-    timestamp: datetime
-
-class GitCommitEvent(SourceEvent):
-    """Git commit event with strict validation."""
-    event_type: str = "git_commit"
-    repo_name: str
-    branch_name: str
-    commit_hash: str = Field(..., min_length=7, max_length=40)
-    message: str
-    author_name: str
-    author_email: str
-    diff: str | None = None
-```
-
-**Insight Models** (`src/cortex/models/insights.py`):
-
-```python
-class Insight(BaseModel):
-    """Structured insight from event processing."""
-    insight_id: str
-    source_event_type: str
-    summary: str
-    patterns: List[str] = []
-    metadata: dict = {}
-    content_for_embedding: str
-    source_event: SourceEvent | None = None
-```
-
-**Why This Pattern**:
-- ✅ Automatic validation: Invalid data raises errors early
-- ✅ Type safety: IDE autocomplete and type checking
-- ✅ Documentation: Models serve as API documentation
-- ✅ Serialization: Easy JSON conversion
-
-### 5. Multi-Agent System Pattern
-
-**Critical Pattern**: Per-request agent instantiation to avoid session state bugs.
-
-**❌ Anti-pattern (Session State Bug)**:
-
-```python
-# WRONG: Global agent reused across requests
-from google.adk.agents import Agent
-
-# This agent accumulates state across multiple calls
-GLOBAL_AGENT = Agent(
-    model="gemini-2.5-pro",
-    instructions="You are a research assistant.",
-)
-
-async def research_task(ctx, topic: str):
-    # BUG: Agent remembers previous topics from other users!
-    result = GLOBAL_AGENT.run(topic)
-    return result
-```
-
-**✅ Recommended (Per-Request Instantiation)**:
-
-```python
-# CORRECT: Create new agent for each request
-from cortex.utility.agent_runner import run_standalone_agent
-from google.adk.agents import Agent
-
-async def research_task(ctx, topic: str):
-    # Create fresh agent with no session state
-    agent = Agent(
-        model="gemini-2.5-pro",
-        instructions="You are a research assistant.",
-        tools=[web_search_tool],
-    )
-    
-    # Run agent and get structured output
-    result = await run_standalone_agent(
-        agent=agent,
-        user_message=topic,
-        response_schema=ResearchOutput,  # Pydantic model
-    )
-    return result
-```
-
-**Why This Pattern**:
-- ✅ No session state leakage between requests
-- ✅ Parallel agent execution is safe
-- ✅ Predictable behavior: Each request is isolated
-- ✅ Easier debugging: No hidden state
-
-**Agent Orchestration Examples**:
-
-```python
-# Sequential agents (curation pipeline)
-research_agent = Agent(model="gemini-2.5-pro", instructions="Research")
-summarizer_agent = Agent(model="gemini-2.5-flash", instructions="Summarize")
-
-research_result = await run_standalone_agent(research_agent, topic)
-summary = await run_standalone_agent(summarizer_agent, research_result)
-
-# Parallel agents (synthesis pipeline)
-private_agent = Agent(model="gemini-2.5-flash", instructions="Query private KB")
-public_agent = Agent(model="gemini-2.5-flash", instructions="Query public KB")
-
-private_result, public_result = await asyncio.gather(
-    run_standalone_agent(private_agent, query),
-    run_standalone_agent(public_agent, query),
-)
-```
-
-## ARQ Task Queue Patterns
-
-### Task Definition
-
-```python
-# src/cortex/workers.py
-async def comprehension_task(ctx: dict, event_data: dict) -> str:
-    """
-    ARQ task function.
-    
-    Args:
-        ctx: Context with injected services from WorkerSettings
-        event_data: Event payload
-    
-    Returns:
-        Task result (logged by ARQ)
-    """
-    pipeline = ctx['comprehension_pipeline']
-    context = {
-        'redis': ctx['redis'],
-        'settings': ctx['settings'],
-    }
-    
-    try:
-        await pipeline.run(event_data, context)
-        return f"Processed {event_data.get('event_type')} event"
-    except Exception as e:
-        logger.error(f"Task failed: {e}", exc_info=True)
-        raise  # ARQ will retry with backoff
-```
-
-### Worker Settings
-
-```python
-class WorkerSettings:
-    """ARQ worker configuration."""
-    
-    # Task functions to register
-    functions = [comprehension_task, synthesis_task]
-    
-    # Redis connection
-    redis_settings = RedisSettings(
-        host='localhost',
-        port=6379,
-    )
-    
-    # Retry configuration
-    max_tries = 3
-    retry_backoff = True  # Exponential backoff
-    
-    # Startup: Inject services into context
-    async def on_startup(ctx):
-        ctx['llm_service'] = LLMService(settings)
-        ctx['chroma_service'] = ChromaService(settings)
-        ctx['comprehension_pipeline'] = build_comprehension_pipeline(ctx)
-    
-    # Shutdown: Cleanup resources
-    async def on_shutdown(ctx):
-        await ctx['redis'].close()
-```
-
-### Enqueuing Tasks
-
-```python
-from arq import create_pool
-from cortex.core.redis import get_redis_pool
-
-async def enqueue_event(event_data: dict):
-    """Enqueue event for processing."""
-    redis = await get_redis_pool()
-    await redis.enqueue_job('comprehension_task', event_data)
-```
-
-## Error Handling Patterns
-
-### Custom Exception Hierarchy
-
-```python
-# src/cortex/exceptions.py
-class CortexError(Exception):
-    """Base exception for all Cortex errors."""
-    pass
-
-class PipelineError(CortexError):
-    """Error during pipeline execution."""
-    pass
-
-class ProcessorError(PipelineError):
-    """Error in specific processor."""
-    pass
-
-class ServiceError(CortexError):
-    """Error in service layer."""
-    pass
-```
-
-### Processor Error Handling
-
-```python
-class RobustProcessor(Processor):
-    async def process(self, data, context):
+    async def process(self, data: dict, context: dict) -> dict:
+        logger.info("Processing with MyProcessor...")
+        
         try:
-            result = await self.risky_operation(data)
+            result = await self.my_service.do_something(data)
+            logger.info("MyProcessor completed successfully")
             return result
-        except SpecificError as e:
-            logger.error(f"Failed to process {data}: {e}", exc_info=True)
-            raise ProcessorError(f"Processing failed: {e}") from e
         except Exception as e:
-            logger.critical(f"Unexpected error: {e}", exc_info=True)
+            logger.error(f"MyProcessor failed: {e}")
             raise
 ```
 
-### Graceful Degradation
-
+**Usage in Pipeline**:
 ```python
-class OptionalProcessor(Processor):
-    async def process(self, data, context):
-        try:
-            enrichment = await self.optional_enrichment(data)
-            return {**data, "enrichment": enrichment}
-        except Exception as e:
-            logger.warning(f"Enrichment failed, continuing: {e}")
-            # Return original data if enrichment fails
-            return data
+# src/cortex/workers.py
+from cortex.services.my_service import MyService
+from cortex.pipelines.my_processor import MyProcessor
+
+my_service = MyService()  # Instantiate service
+pipeline = Pipeline([
+    SomeProcessor(),
+    MyProcessor(my_service),  # Inject here
+    AnotherProcessor(),
+])
 ```
 
-## Logging Patterns
+## Service Layer Pattern
+
+### Service Organization
+
+**Location**: `src/cortex/services/`
+
+Services encapsulate external integrations and business logic:
+- `llmservice.py` - LLM abstraction (Ollama + Gemini)
+- `chroma_service.py` - ChromaDB operations
+- `knowledge_graph_service.py` - Markdown file management
+- `upstash_service.py` - Upstash vector DB client
+- `prompt_manager.py` - Jinja2 template rendering
+
+### LLMService Pattern
+
+**File**: `src/cortex/services/llmservice.py:10`
+
+**Key Features**:
+- **Hybrid Model Support**: Automatically routes to Ollama (local) or Gemini (cloud) based on model name
+- **Configuration-Driven**: Uses Pydantic Settings for model selection
+- **Prompt Templates**: Integrates with PromptManager for Jinja2 templates
+
+```python
+class LLMService:
+    def __init__(self):
+        self.settings = Settings()
+        self.prompt_manager = PromptManager()
+        self._gemini_client = genai.Client()
+    
+    def generate(self, prompt: str, model: Optional[str] = None) -> str:
+        model_to_use = model or self.settings.llm_model
+        
+        if model_to_use.startswith("gemini-"):
+            return self._generate_with_gemini(prompt, model_to_use)
+        else:
+            return self._generate_with_ollama(prompt, model_to_use)
+```
+
+**Usage Pattern**:
+```python
+llm_service = LLMService()
+
+# Local Ollama (private data)
+summary = llm_service.generate(
+    prompt=f"Summarize: {user_code}",
+    model="llama3.1:latest"
+)
+
+# Cloud Gemini (public data)
+insight = llm_service.generate(
+    prompt=synthesis_prompt,
+    model=llm_service.settings.gemini_pro_model
+)
+```
+
+### ChromaService Pattern
+
+**File**: `src/cortex/services/chroma_service.py`
+
+**Key Operations**:
+- `add_document(doc_id, content, metadata)` - Embeds and stores
+- `query(query_text, n_results)` - Semantic search
+- Uses local Ollama embeddings (`nomic-embed-text:v1.5`)
+
+**Pattern**:
+```python
+chroma_service = ChromaService()
+
+# Add with metadata
+chroma_service.add_document(
+    doc_id=insight.insight_id,
+    content=insight.content_for_embedding,
+    metadata={
+        "file_path": "src/data/knowledge_graph/insights/commit_abc123.md",
+        "commit_hash": "abc123",
+        "repo_name": "cortex_mentor"
+    }
+)
+
+# Query
+results = chroma_service.query("authentication patterns", n_results=5)
+# Returns: {"documents": [...], "metadatas": [...], "distances": [...]}
+```
+
+### KnowledgeGraphService Pattern
+
+**File**: `src/cortex/services/knowledge_graph_service.py`
+
+**Key Concept**: Zettelkasten-style interlinked markdown files
+
+**Pattern**:
+```python
+kg_service = KnowledgeGraphService()
+
+# Writes markdown file with front matter
+kg_service.process_insight(insight)
+
+# Creates file: data/knowledge_graph/insights/commit_abc123.md
+```
+
+**Markdown Format**:
+```markdown
+---
+insight_id: commit_abc123
+source_event_type: git_commit
+timestamp: 2024-11-29T12:00:00Z
+tags: [authentication, security]
+---
+
+# Summary
+Added JWT authentication to API endpoints
+
+## Related Insights
+- [[commit_xyz789]] - OAuth implementation
+- [[code_def456]] - Token validation logic
+
+## Metadata
+- Repo: cortex_mentor
+- Branch: main
+- Commit: abc123...
+```
+
+## API Design Patterns
+
+### Event Ingestion Pattern
+
+**File**: `src/cortex/api/events.py`
+
+**Pattern**: FastAPI router with Pydantic validation + ARQ task enqueue
+
+```python
+from fastapi import APIRouter, Request
+from cortex.models.events import GitCommitEvent, CodeChangeEvent
+
+router = APIRouter()
+
+@router.post("/events")
+async def receive_event(event_data: dict, request: Request):
+    """
+    Receives events from observers and enqueues for processing.
+    """
+    event_type = event_data.get("event_type")
+    
+    # Enqueue to ARQ worker
+    redis = request.app.state.redis
+    await redis.enqueue_job('process_event_task', event_data)
+    
+    return {"status": "queued", "event_type": event_type}
+```
+
+**Design Decisions**:
+- **Async by default**: All endpoints are async
+- **Validation**: Use Pydantic models for request/response
+- **Queue immediately**: Don't process in HTTP handler, enqueue to worker
+- **Return quickly**: Acknowledge receipt, process asynchronously
+
+### WebSocket Pattern
+
+**File**: `src/cortex/main.py:35`
+
+**Pattern**: Long-lived connection with broadcast capability
+
+```python
+from cortex.core.ws_connection_manager import ConnectionManager
+
+manager = ConnectionManager()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        # Keep alive indefinitely
+        await asyncio.Future()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+```
+
+**ConnectionManager Pattern**:
+```python
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+    
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+    
+    async def broadcast(self, message: bytes):
+        for connection in self.active_connections:
+            await connection.send_bytes(message)
+```
+
+## Background Task Patterns
+
+### ARQ Task Pattern
+
+**File**: `src/cortex/workers.py`
+
+**Pattern**: Define async functions + WorkerSettings class
+
+```python
+async def process_event_task(ctx, event_data: dict):
+    """ARQ task to process events"""
+    # 1. Instantiate services (fresh for each task)
+    kg_service = KnowledgeGraphService()
+    chroma_service = ChromaService()
+    llm_service = LLMService()
+    
+    # 2. Build pipeline with injected dependencies
+    pipeline = Pipeline([...])
+    
+    # 3. Execute with context
+    context = {"redis": ctx.get("redis")}
+    await pipeline.execute(data=event_data, context=context)
+
+class WorkerSettings:
+    functions = [process_event_task, synthesis_task]
+    queues = ['high_priority', 'low_priority']
+    on_startup = on_startup      # Creates Redis pool
+    on_shutdown = on_shutdown    # Closes Redis pool
+```
+
+**Key Patterns**:
+1. **Per-task service instantiation**: Fresh instances for each task
+2. **Context for shared resources**: Redis pool in context
+3. **Dependency injection**: Services injected into processors
+4. **Lifecycle hooks**: `on_startup`/`on_shutdown` for resource management
+
+### Redis Pub/Sub Pattern
+
+**File**: `src/cortex/main.py:47`
+
+**Pattern**: Background task subscribes to channel, broadcasts to WebSocket clients
+
+```python
+async def redis_pubsub_listener(app: FastAPI):
+    redis = app.state.redis
+    pubsub = redis.pubsub()
+    await pubsub.subscribe("insights_channel")
+    
+    try:
+        while True:
+            message = await pubsub.get_message(ignore_subscribe_messages=True)
+            if message and message["type"] == "message":
+                data = message["data"]  # bytes
+                await manager.broadcast(data)
+            await asyncio.sleep(0.01)
+    except asyncio.CancelledError:
+        await pubsub.unsubscribe("insights_channel")
+```
+
+**Publishing Pattern**:
+```python
+# In AudioDeliveryProcessor
+async def process(self, data: dict, context: dict) -> None:
+    redis = context["redis"]
+    audio_bytes = generate_audio(data["final_insight"])
+    await redis.publish("insights_channel", audio_bytes)
+```
+
+## Multi-Agent Pattern
+
+### Google ADK Agent Pattern
+
+**File**: `src/cortex/pipelines/synthesis.py:118` (KnowledgeGatewayProcessor)
+
+**Critical Pattern**: Instantiate agents per-request to avoid session state reuse
+
+```python
+from google.adk.agents import LlmAgent
+from cortex.utility.agent_runner import run_standalone_agent
+
+class MyProcessor(Processor):
+    def __init__(self, llm_service: LLMService):
+        self.llm_service = llm_service
+        # DON'T instantiate agent here!
+    
+    async def process(self, data: dict, context: dict) -> dict:
+        # GOOD: Instantiate fresh agent for each request
+        agent = LlmAgent(
+            name="my_agent",
+            instruction=self.prompt_manager.render("agent_prompt.jinja2"),
+            output_schema=MyOutputModel,
+            model=self.llm_service.settings.gemini_flash_model,
+        )
+        
+        result = await run_standalone_agent(agent, user_prompt)
+        return result
+```
+
+**Why**: Google ADK agents maintain session state. Reusing instances across requests causes context bleeding.
+
+### Structured Output Pattern
+
+```python
+from pydantic import BaseModel
+
+class GatewayDecision(BaseModel):
+    needs_improvement: bool
+    reasoning: str
+
+agent = LlmAgent(
+    name="gateway_agent",
+    instruction="Evaluate knowledge quality...",
+    output_schema=GatewayDecision,  # Forces JSON output
+)
+
+result = await run_standalone_agent(agent, prompt)
+decision = GatewayDecision.model_validate_json(result)
+```
+
+## Configuration Pattern
+
+### Pydantic Settings Pattern
+
+**File**: `src/cortex/core/config.py`
+
+```python
+from pydantic_settings import BaseSettings
+from pathlib import Path
+import os
+
+class Settings(BaseSettings):
+    # Computed paths (relative to source)
+    chromadb_path: str = str(Path(__file__).parent.parent.parent / "data/...")
+    
+    # Environment variables
+    upstash_url: str = ""
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    
+    # Defaults
+    llm_model: str = "llama3.1:latest"
+    
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
+```
+
+**Usage**:
+```python
+settings = Settings()  # Reads .env automatically
+print(settings.gemini_api_key)
+```
+
+## Error Handling Pattern
+
+### Custom Exception Pattern
+
+**File**: `src/cortex/exceptions.py`
+
+```python
+class ProcessorError(Exception):
+    """Raised when a processor fails"""
+    pass
+```
+
+**Usage in Processors**:
+```python
+try:
+    result = await self.service.operation()
+except Exception as e:
+    logger.error(f"Operation failed: {e}", exc_info=True)
+    raise ProcessorError(f"MyProcessor failed: {e}") from e
+```
+
+## Logging Pattern
 
 ### Structured Logging
 
@@ -429,149 +467,66 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class MyProcessor(Processor):
-    async def process(self, data, context):
-        logger.info(
-            "Processing event",
-            extra={
-                "event_type": data.get("event_type"),
-                "processor": self.__class__.__name__,
-                "timestamp": datetime.utcnow().isoformat(),
-            }
-        )
-        # ... processing logic
-        logger.info("Event processed successfully")
+# In processor
+logger.info(f"Processing {data.insight_id}...")
+logger.error(f"Failed to process {data.insight_id}: {e}", exc_info=True)
+logger.warning(f"Unexpected result: {result}")
 ```
 
-### Log Levels
-
-- `DEBUG`: Detailed diagnostic information (e.g., LLM prompts)
-- `INFO`: General informational messages (e.g., task started/completed)
-- `WARNING`: Something unexpected but handled (e.g., missing optional field)
-- `ERROR`: Operation failed but recoverable (e.g., processor error)
-- `CRITICAL`: System-level failure (e.g., Redis connection lost)
-
-## Configuration Patterns
-
-### Pydantic Settings
-
+**Configure in main**:
 ```python
-# src/cortex/core/config.py
-from pydantic_settings import BaseSettings
-from pathlib import Path
-
-class Settings(BaseSettings):
-    """Centralized configuration."""
-    
-    # Redis
-    redis_host: str = "localhost"
-    redis_port: int = 6379
-    
-    # Ollama
-    ollama_base_url: str = "http://localhost:11434"
-    ollama_embedding_model: str = "nomic-embed-text:v1.5"
-    
-    # Google AI
-    gemini_api_key: str  # Required, no default
-    
-    # Paths (resolve relative to project root)
-    knowledge_graph_path: Path = Path(__file__).parent.parent.parent / "data/knowledge_graph"
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-
-# Usage
-settings = Settings()  # Auto-loads from .env
+logging.basicConfig(level=logging.INFO)
 ```
 
 ## Testing Patterns
 
-### Processor Unit Tests
+### Test Structure
+
+**Location**: `tests/`
+
+**Pattern**: Pytest with async support
 
 ```python
 import pytest
-from cortex.pipelines.comprehension import InsightGenerator
-from cortex.services.llmservice import LLMService
+from cortex.pipelines.my_processor import MyProcessor
 
 @pytest.mark.asyncio
-async def test_insight_generator():
+async def test_my_processor():
     # Arrange
-    mock_llm = MockLLMService()
-    processor = InsightGenerator(llm_service=mock_llm)
-    event = GitCommitEvent(
-        event_type="git_commit",
-        repo_name="test-repo",
-        # ... other fields
-    )
+    processor = MyProcessor(mock_service)
+    data = {"key": "value"}
     context = {}
     
     # Act
-    result = await processor.process(event, context)
+    result = await processor.process(data, context)
     
     # Assert
-    assert isinstance(result, Insight)
-    assert result.source_event_type == "git_commit"
-    assert mock_llm.generate_called
+    assert result["key"] == "expected"
 ```
 
-### Service Mocking
+## Privacy Boundaries
 
+### Local vs Cloud Processing
+
+**Rule**: User code/commits/private data → Ollama (local only)
+
+**Pattern**:
 ```python
-class MockLLMService:
-    def __init__(self):
-        self.generate_called = False
-    
-    def generate_commit_summary(self, commit_message, commit_diff):
-        self.generate_called = True
-        return "Mock summary"
+# GOOD: Private data processed locally
+llm_service.generate(
+    prompt=f"Summarize commit: {commit_diff}",
+    model="llama3.1:latest"  # Local Ollama
+)
+
+# GOOD: Public knowledge processed in cloud
+llm_service.generate(
+    prompt=f"Synthesize: {public_knowledge}",
+    model=llm_service.settings.gemini_pro_model  # Cloud Gemini
+)
+
+# BAD: Sending user code to cloud
+llm_service.generate(
+    prompt=f"Analyze: {user_code}",
+    model="gemini-2.5-pro"  # ❌ PRIVACY VIOLATION
+)
 ```
-
-## Privacy Patterns
-
-### Local-First Processing
-
-```python
-class PrivateDataProcessor(Processor):
-    def __init__(self, local_llm: LLMService):
-        # Only use local Ollama for private data
-        self.llm = local_llm
-    
-    async def process(self, user_code: str, context):
-        # This NEVER goes to cloud
-        summary = self.llm.generate_with_ollama(
-            model="llama3.1:latest",
-            prompt=f"Summarize: {user_code}"
-        )
-        return summary
-```
-
-### Cloud Processing (Anonymized)
-
-```python
-class PublicKnowledgeProcessor(Processor):
-    def __init__(self, cloud_llm: LLMService):
-        # OK to use cloud Gemini for public knowledge
-        self.llm = cloud_llm
-    
-    async def process(self, anonymized_query: str, context):
-        # No user-specific data in this query
-        result = self.llm.generate_with_gemini(
-            model="gemini-2.5-flash",
-            prompt=f"Query knowledge base: {anonymized_query}"
-        )
-        return result
-```
-
-## Best Practices Summary
-
-1. **Use Processors for Modularity**: Every processing step should be a processor
-2. **Inject Dependencies**: Pass services via constructor, not context
-3. **Per-Request Agents**: Never reuse Google ADK agents across requests
-4. **Validate with Pydantic**: Use models for all data structures
-5. **Parallel When Possible**: Use lists in pipelines for parallel execution
-6. **Privacy-First**: Local Ollama for user data, cloud Gemini for synthesis
-7. **Structured Logging**: Include context in log messages
-8. **Graceful Degradation**: Handle optional failures without crashing
-9. **Type Everything**: Use type hints for better IDE support and safety
-10. **Test in Isolation**: Unit test processors with mocked services
