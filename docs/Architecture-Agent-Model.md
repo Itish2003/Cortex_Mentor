@@ -15,11 +15,11 @@ The core components are:
     - **Markdown Files (Source of Truth)**: The `data/knowledge_graph/` directory contains interlinked markdown files that form the primary, human-readable, and persistent memory of the mentor's understanding of the user (the "Zettelkasten").
     - **ChromaDB (Search Index)**: A local ChromaDB instance acts as a performance layer, storing vector embeddings of the markdown content. It serves as a high-speed, machine-readable search index, with metadata pointing back to the source markdown files.
   - **Public MCP Knowledge Base**: A cloud-based Upstash Context platform containing curated, high-quality software development knowledge.
-- **AI Agent Fleet**:
-  - **Level 1 (Comprehension)**: Processes raw events and stores insights in the private user model.
-  - **Level 2 (Synthesis)**: Combines insights from both the private user model and the public MCP knowledge base to provide expert advice.
-  - **Level 3 (Engagement)**: An `AudioDeliveryProcessor` that uses Gemini TTS to convert synthesized insights into audio and delivers them in real-time.
-  - **Corpus Curator**: A background agent responsible for populating and maintaining the public MCP knowledge base.
+- **Processing Pipelines**:
+  - **Level 1 (Comprehension Pipeline)**: Processes raw events and stores insights in the private user model.
+  - **Level 2 (Synthesis Pipeline)**: Combines insights from both the private user model and the public MCP knowledge base to provide expert advice.
+  - **Level 3 (Delivery Pipeline)**: The `AudioDeliveryProcessor` uses Gemini TTS to convert synthesized insights into audio and delivers them in real-time.
+  - **Curation Pipeline**: A background pipeline responsible for populating and maintaining the public MCP knowledge base.
 - **Observers**: A collection of local tools that monitor file changes, Git hooks, and IDE events.
 - **Real-time Communication**: WebSockets for client-server communication and Redis Pub/Sub as a message bus between background workers and the FastAPI server.
 - **AI Services**: Integration with Google Gemini models, including Gemini TTS for advanced audio synthesis.
@@ -55,11 +55,11 @@ graph TD
             E["<b>ARQ Task Queue</b><br/><i>(Managed by Redis)</i>"]
         end
 
-        subgraph "Agent Fleet (Persistent ARQ Workers)"
-            AGENT_L1["<b>L1: Comprehension Agent</b><br/><i>Analyzes Raw Events</i>"]
-            AGENT_L2["<b>L2: Synthesis & Strategy Agent</b><br/><i>Forms Opinions & Plans</i>"]
-            AGENT_L3["<b>L3: Engagement</b><br/><i>(AudioDeliveryProcessor)</i>"]
-            AGENT_CURATOR["<b>Corpus Curator Agent</b><br/><i>(Background Librarian)</i>"]
+        subgraph "Processing Pipelines (Persistent ARQ Workers)"
+            AGENT_L1["<b>L1: Comprehension Pipeline</b><br/><i>Analyzes Raw Events</i>"]
+            AGENT_L2["<b>L2: Synthesis Pipeline</b><br/><i>Forms Opinions & Plans</i>"]
+            AGENT_L3["<b>L3: Delivery Pipeline</b><br/><i>(AudioDeliveryProcessor)</i>"]
+            AGENT_CURATOR["<b>Curation Pipeline</b><br/><i>(Background Librarian)</i>"]
         end
 
         subgraph "Public RAG System (MCP)"
