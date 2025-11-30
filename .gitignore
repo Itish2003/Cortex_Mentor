@@ -19,3 +19,7 @@ __pycache__/
 
 # Trash/temporary scripts
 /scripts/.trash*
+
+.claude
+.gemini
+.pytest_cache/
