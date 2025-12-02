@@ -2,6 +2,10 @@ from cortex.core.config import Settings
 import chromadb
 import requests
 from typing import List
+import logging
+from cortex.exceptions import ServiceError
+
+logger = logging.getLogger(__name__)
 
 # This is now a standalone helper class, not a ChromaDB type.
 class OllamaEmbeddingHelper:
@@ -11,11 +15,15 @@ class OllamaEmbeddingHelper:
 
     def get_embedding(self, text: str) -> List[float]:
         """Generates a single embedding for a single piece of text."""
-        response = requests.post(
-            self.settings.llm_embed_url,
-            json={"model": self.model, "input": text}
-        )
-        response.raise_for_status()
+        try:
+            response = requests.post(
+                self.settings.llm_embed_url,
+                json={"model": self.model, "input": text}
+            )
+            response.raise_for_status()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get embedding from Ollama: {e}", exc_info=True)
+            raise ServiceError(f"Failed to get embedding from Ollama: {e}") from e
         return response.json()["embeddings"][0]
 
 class ChromaService:
@@ -36,13 +44,17 @@ class ChromaService:
         # 1. Manually generate the embedding for the document content.
         embedding = self.embedding_helper.get_embedding(content)
 
-        # 2. Add the document, but this time provide the pre-computed embedding.
-        self.collection.add(
-            ids=[doc_id],
-            embeddings=[embedding], # Pass the vector directly
-            documents=[content],
-            metadatas=[metadata]
-        )
+        try:
+            # 2. Add the document, but this time provide the pre-computed embedding.
+            self.collection.add(
+                ids=[doc_id],
+                embeddings=[embedding], # Pass the vector directly
+                documents=[content],
+                metadatas=[metadata]
+            )
+        except Exception as e:
+            logger.error(f"Failed to add document to Chroma: {e}", exc_info=True)
+            raise ServiceError(f"Failed to add document to ChromaDB: {e}") from e
 
     def query(self, query_text: str, n_results: int = 3):
         """Query the collection for similar documents."""

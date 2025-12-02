@@ -4,6 +4,7 @@ import logging
 from redis.asyncio import Redis
 from google.cloud import texttospeech
 from cortex.core.config import Settings
+from cortex.exceptions import ProcessorError
 import base64
 import json
 
@@ -62,6 +63,7 @@ class AudioDeliveryProcessor(Processor):
 
         except Exception as e:
             logger.error(f"Error during audio generation or publishing: {e}", exc_info=True)
+            raise ProcessorError(f"Error during audio generation or publishing: {e}")
 
         return data
  
