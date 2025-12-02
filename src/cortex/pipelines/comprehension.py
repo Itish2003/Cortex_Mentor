@@ -109,6 +109,8 @@ class InsightGenerator(Processor):
         except Exception as e:
             logger.error(f"Failed to generate insight for event {data.event_type}: {e}", exc_info=True)
             raise ProcessorError(f"InsightGenerator failed due to unexpected error: {e}") from e
+
+        raise TypeError(f"Unsupported event type for insight generation: {type(data)}")
     
 class KnowledgeGraphWriter(Processor):
     """

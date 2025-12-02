@@ -69,7 +69,7 @@ class KnowledgeGraphService:
                 f.write(f"# Insight: {insight.summary}\n\n")
 
             return insight_file
-        except Exception as e:
+        except (IOError, OSError) as e:
             raise ServiceError(f"Error creating insight node: {e}")
     
     def _update_index_node(self, index_file: Path, link_to_add: Path):
@@ -89,7 +89,7 @@ class KnowledgeGraphService:
             else:
                 with open(index_file, "a", encoding="utf-8") as f:
                     f.write(link_markdown)
-        except Exception as e:
+        except (IOError,OSError) as e:
             raise ServiceError(f"Error updating index node: {e}")
 
     def process_insight(self, insight: Insight):
