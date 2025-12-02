@@ -8,6 +8,7 @@ from cortex.services.chroma_service import ChromaService
 from cortex.exceptions import ProcessorError, ServiceError
 import logging
 from uuid import uuid4
+import redis.exceptions
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -168,6 +169,9 @@ class SynthesisTrigger(Processor):
                 await redis.enqueue_job('synthesis_task', data.content_for_embedding)
                 logger.info(f"Synthesis task triggered for insight {data.insight_id}.")
                 return None
+        except redis.exceptions.RedisError as e: # Catch Redis specific errors
+            logger.error(f"Failed to trigger synthesis task for insight {data.insight_id}: {e}", exc_info=True)
+            raise ProcessorError(f"SynthesisTrigger failed due to service error: {e}") from e
         except Exception as e:
             logger.error(f"Failed to trigger synthesis task for insight {data.insight_id}: {e}", exc_info=True)
             raise ProcessorError(f"SynthesisTrigger failed due to unexpected error: {e}") from e
