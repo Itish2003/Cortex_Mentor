@@ -5,9 +5,10 @@ from cortex.models.insights import Insight
 from cortex.services.llmservice import LLMService
 from cortex.services.knowledge_graph_service import KnowledgeGraphService
 from cortex.services.chroma_service import ChromaService
-from cortex.exceptions import ProcessorError
+from cortex.exceptions import ProcessorError, ServiceError
 import logging
 from uuid import uuid4
+import redis.exceptions
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -48,60 +49,67 @@ class InsightGenerator(Processor):
             A new Insight object.
         """
         logger.info(f"Generating insight for event type: {data.event_type}")
+        try:
+            if isinstance(data, GitCommitEvent):
+                # Now, use the instance created in __init__
+                summary = self.llm_service.generate_commit_summary(
+                    commit_message=data.message or "",
+                    commit_diff=data.diff or ""
+                )
+                content_for_embedding = (
+                    f"Commit by {data.author_name} to {data.repo_name}/{data.branch_name}. "
+                    f"Summary: {summary}. "
+                    f"Message: {data.message}"
+                )
+                insight = Insight(
+                    insight_id=f"commit_{uuid4().hex[:12]}",
+                    source_event_type="git_commit",
+                    summary=summary,
+                    patterns=[],
+                    metadata={
+                        "repo_name": data.repo_name,
+                        "branch_name": data.branch_name,
+                        "commit_hash": data.commit_hash,
+                    },
+                    content_for_embedding=content_for_embedding,
+                    source_event=data
+                )
+                return insight
 
-        if isinstance(data, GitCommitEvent):
-            # Now, use the instance created in __init__
-            summary = self.llm_service.generate_commit_summary(
-                commit_message=data.message or "",
-                commit_diff=data.diff or ""
-            )
-            content_for_embedding = (
-                f"Commit by {data.author_name} to {data.repo_name}/{data.branch_name}. "
-                f"Summary: {summary}. "
-                f"Message: {data.message}"
-            )
-            insight = Insight(
-                insight_id=f"commit_{uuid4().hex[:12]}",
-                source_event_type="git_commit",
-                summary=summary,
-                patterns=[],
-                metadata={
-                    "repo_name": data.repo_name,
-                    "branch_name": data.branch_name,
-                    "commit_hash": data.commit_hash,
-                },
-                content_for_embedding=content_for_embedding,
-                source_event=data
-            )
-            return insight
+            elif isinstance(data, CodeChangeEvent):
+                summary = self.llm_service.generate_code_change_summary(
+                    file_path=data.file_path,
+                    change_type=data.change_type,
+                    content=data.content or ""
+                )
 
-        elif isinstance(data, CodeChangeEvent):
-            summary = self.llm_service.generate_code_change_summary(
-                file_path=data.file_path,
-                change_type=data.change_type,
-                content=data.content or ""
-            )
+                content_for_embedding = (
+                    f"File change in {data.file_path}. "
+                    f"Type: {data.change_type}. "
+                    f"Summary: {summary}."
+                )
 
-            content_for_embedding = (
-                f"File change in {data.file_path}. "
-                f"Type: {data.change_type}. "
-                f"Summary: {summary}."
-            )
-
-            insight = Insight(
-                insight_id=f"code_{uuid4().hex[:12]}",
-                source_event_type="file_change",
-                summary=summary,
-                patterns=[],
-                metadata={
-                    "file_path": data.file_path,
-                    "change_type": data.change_type,
-                },
-                content_for_embedding=content_for_embedding,
-                source_event=data
-            )
-            return insight
+                insight = Insight(
+                    insight_id=f"code_{uuid4().hex[:12]}",
+                    source_event_type="file_change",
+                    summary=summary,
+                    patterns=[],
+                    metadata={
+                        "file_path": data.file_path,
+                        "change_type": data.change_type,
+                    },
+                    content_for_embedding=content_for_embedding,
+                    source_event=data
+                )
+                return insight
+        except ServiceError as e:
+            logger.error(f"Failed to generate insight for event {data.event_type}: {e}", exc_info=True)
+            raise ProcessorError(f"InsightGenerator failed due to service error: {e}") from e
         
+        except Exception as e:
+            logger.error(f"Failed to generate insight for event {data.event_type}: {e}", exc_info=True)
+            raise ProcessorError(f"InsightGenerator failed due to unexpected error: {e}") from e
+
         raise TypeError(f"Unsupported event type for insight generation: {type(data)}")
     
 class KnowledgeGraphWriter(Processor):
@@ -116,9 +124,12 @@ class KnowledgeGraphWriter(Processor):
             logger.info(f"Writing insight {data.insight_id} to knowledge graph.")
             self.kg_service.process_insight(data)
             logger.info(f"Insight {data.insight_id} written to knowledge graph.")
+        except ServiceError as e:
+            logger.error(f"Failed to write insight {data.insight_id}: {e}", exc_info=True)
+            raise ProcessorError(f"KnowledgeGraphWriter failed due to service error: {e}") from e
         except Exception as e:
             logger.error(f"Failed to write insight {data.insight_id}: {e}", exc_info=True)
-            raise ProcessorError(f"KnowledgeGraphWriter failed: {e}") from e
+            raise ProcessorError(f"KnowledgeGraphWriter failed due to unexpected error: {e}") from e
         return None
     
 class ChromaWriter(Processor):
@@ -138,9 +149,12 @@ class ChromaWriter(Processor):
             )
             logger.info(f"Insight {data.insight_id} added to ChromaDB.")
             return None
+        except ServiceError as e:
+            logger.error(f"Failed to add insight {data.insight_id}: {e}", exc_info=True)
+            raise ProcessorError(f"ChromaWriter failed due to service error: {e}") from e
         except Exception as e:
             logger.error(f"Failed to add insight {data.insight_id}: {e}", exc_info=True)
-            raise ProcessorError(f"ChromaWriter failed: {e}") from e
+            raise ProcessorError(f"ChromaWriter failed due to unexpected error: {e}") from e
 
 class SynthesisTrigger(Processor):
     """
@@ -154,10 +168,12 @@ class SynthesisTrigger(Processor):
                 logger.error("Redis pool not found in context for SynthesisTrigger.")
                 raise ProcessorError("Redis pool not found in context for SynthesisTrigger.")
             if data:
-                logger.info(f"Enqueuing synthesis task for insight {data.insight_id}.")
                 await redis.enqueue_job('synthesis_task', data.content_for_embedding)
                 logger.info(f"Synthesis task triggered for insight {data.insight_id}.")
                 return None
+        except redis.exceptions.RedisError as e: # Catch Redis specific errors
+            logger.error(f"Failed to trigger synthesis task for insight {data.insight_id}: {e}", exc_info=True)
+            raise ProcessorError(f"SynthesisTrigger failed due to service error: {e}") from e
         except Exception as e:
             logger.error(f"Failed to trigger synthesis task for insight {data.insight_id}: {e}", exc_info=True)
-            raise ProcessorError(f"SynthesisTrigger failed: {e}") from e
+            raise ProcessorError(f"SynthesisTrigger failed due to unexpected error: {e}") from e
