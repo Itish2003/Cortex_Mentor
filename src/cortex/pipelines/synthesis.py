@@ -87,7 +87,7 @@ class PublicKnowledgeQuerier(Processor):
 
     async def process(self, data: str, context: dict) -> dict:
         logger.info("Querying public knowledge store (Upstash)...")
-        public_results = await self.upstash_service.query(data, n_results=2)
+        public_results = await self.upstash_service.query(data=data, n_results=2, include_metadata=True)
         return {
             "public_results": public_results, 
             "query_text": data
@@ -112,7 +112,7 @@ class KnowledgeGatewayProcessor(Processor):
         
         # Sanitize the public knowledge before passing it to the prompt
         sanitized_results = [str(r).replace("/", " ").replace("\n", " ") for r in public_results]
-        public_context = "\n".join(sanitized_results)
+        public_context = " ".join(sanitized_results) # Change from "\n".join to " ".join
 
         # FIX: Instantiate the agent here for every request to ensure a fresh session
         gateway_agent = LlmAgent(
@@ -130,18 +130,20 @@ class KnowledgeGatewayProcessor(Processor):
             public_context=public_context
         )
         
-        # Use the local gateway_agent instance
-        evaluation_str = await run_standalone_agent(gateway_agent, prompt)
-        
+        evaluation_str = "" # Initialize evaluation_str
+        decision = False # Initialize decision
+
         try:
+            evaluation_str = await run_standalone_agent(gateway_agent, prompt)
             gateway_decision = GatewayDecision.model_validate_json(evaluation_str)
             decision = gateway_decision.needs_improvement
-        except Exception:
-            # Fallback for non-json response
+        except Exception as e:
+            logger.error(f"Error running LLM agent for KnowledgeGatewayProcessor: {e}", exc_info=True)
+            # Fallback for non-json response or agent errors
             if "true" in evaluation_str.lower() or "NEEDS_IMPROVEMENT" in evaluation_str:
                 decision = True
             else:
-                decision = False
+                decision = False # Default to false on error
 
         logger.info(f"Knowledge evaluation result: {decision}")
         data["needs_improvement"] = decision

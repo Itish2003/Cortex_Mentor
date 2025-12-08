@@ -16,6 +16,7 @@ __pycache__/
 
 # Generated data and logs
 /src/data/
+.coverage
 
 # Trash/temporary scripts
 /scripts/.trash*
