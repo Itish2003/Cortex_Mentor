@@ -5,8 +5,10 @@ from cortex.exceptions import ServiceError
 import requests
 
 @pytest.fixture
-def llm_service():
-    """Fixture to provide an instance of LLMService."""
+def llm_service(mocker):
+    """Fixture to provide an instance of LLMService with mocked Gemini client."""
+    # Mock the Google GenAI client initialization to avoid API key requirement
+    mocker.patch('google.genai.Client')
     return LLMService()
 
 def test_generate_with_ollama_success(llm_service, mocker):
