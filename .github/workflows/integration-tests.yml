@@ -5,7 +5,6 @@ on:
     paths:
       - 'src/**'
       - 'tests/**'
-      - 'cortex-vs/**'
       - '.github/workflows/integration-tests.yml'
 
 jobs:
