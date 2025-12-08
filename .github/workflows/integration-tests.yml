@@ -30,25 +30,40 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        run: pip install uv
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.2
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
 
       - name: Install dependencies
-        run: uv pip install -e .[dev] --system
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
 
       - name: Verify Redis connection
         run: |
-          python -c "import redis; r = redis.Redis(); r.ping(); print('Redis connection successful')"
+          poetry run python -c "import redis; r = redis.Redis(); r.ping(); print('Redis connection successful')"
 
       - name: Run integration tests
         run: |
-          uv run pytest tests/test_integration.py -v -m integration --tb=short
+          poetry run pytest tests/test_integration.py -v -m integration --tb=short
         env:
           REDIS_URL: redis://localhost:6379
 
       - name: Start backend server
         run: |
-          uv run uvicorn src.cortex.main:app --host 0.0.0.0 --port 8000 &
+          poetry run uvicorn src.cortex.main:app --host 0.0.0.0 --port 8000 &
           echo $! > server.pid
           sleep 5
 
@@ -65,7 +80,7 @@ jobs:
 
       - name: Start ARQ worker
         run: |
-          uv run arq src.cortex.workers.WorkerSettings &
+          poetry run arq src.cortex.workers.WorkerSettings &
           echo $! > worker.pid
           sleep 5
 
@@ -99,19 +114,34 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        run: pip install uv
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.2
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
 
       - name: Install dependencies
-        run: uv pip install -e .[dev] --system
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
 
       - name: Run API tests
         run: |
-          uv run pytest tests/test_api.py -v
+          poetry run pytest tests/test_api.py -v
 
       - name: Test API schema generation
         run: |
-          python -c "
+          poetry run python -c "
           from cortex.main import app
           from fastapi.openapi.utils import get_openapi
           schema = get_openapi(
@@ -135,16 +165,31 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install uv
-        run: pip install uv
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: 1.8.2
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Load cached venv
+        id: cached-poetry-dependencies
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
 
       - name: Install dependencies
-        run: uv pip install -e .[dev] --system
+        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+        run: poetry install --no-interaction --no-root
+
+      - name: Install project
+        run: poetry install --no-interaction
 
       - name: Run pipeline tests
         run: |
-          uv run pytest tests/test_pipelines.py tests/test_comprehension.py tests/test_curation.py tests/test_delivery.py tests/test_graph_traversal.py -v
+          poetry run pytest tests/test_pipelines.py tests/test_comprehension.py tests/test_curation.py tests/test_delivery.py tests/test_graph_traversal.py -v
 
       - name: Run worker tests
         run: |
-          uv run pytest tests/test_workers.py -v
+          poetry run pytest tests/test_workers.py -v
