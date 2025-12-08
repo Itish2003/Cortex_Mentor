@@ -1,0 +1,19 @@
+name: Extension Tests
+on: [pull_request, push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: cd cortex-vs && npm install
+      - name: Run type checking
+        run: cd cortex-vs && npm run check-types
+      - name: Run linting
+        run: cd cortex-vs && npm run lint
+      - name: Run tests
+        run: cd cortex-vs && npm test
