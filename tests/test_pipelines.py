@@ -74,7 +74,7 @@ async def test_knowledge_gateway_processor_needs_improvement_true(gateway_proces
     # Assert PromptManager.render calls
     expected_calls = [
         call("knowledge_gateway.jinja2"), # For instruction
-        call("knowledge_gateway.jinja2", query_text="test query", public_context="result 1 result 2") # For prompt
+        call("knowledge_gateway.jinja2", query_text="test query", public_context="result 1\nresult 2") # For prompt
     ]
     mock_prompt_manager.render.assert_has_calls(expected_calls)
     
