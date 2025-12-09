@@ -87,7 +87,7 @@ class PublicKnowledgeQuerier(Processor):
 
     async def process(self, data: str, context: dict) -> dict:
         logger.info("Querying public knowledge store (Upstash)...")
-        public_results = await self.upstash_service.query(data=data, n_results=2, include_metadata=True)
+        public_results = await self.upstash_service.query(data, n_results=2)
         return {
             "public_results": public_results, 
             "query_text": data
@@ -112,7 +112,7 @@ class KnowledgeGatewayProcessor(Processor):
         
         # Sanitize the public knowledge before passing it to the prompt
         sanitized_results = [str(r).replace("/", " ").replace("\n", " ") for r in public_results]
-        public_context = " ".join(sanitized_results) # Change from "\n".join to " ".join
+        public_context = "\n".join(sanitized_results) 
 
         # FIX: Instantiate the agent here for every request to ensure a fresh session
         gateway_agent = LlmAgent(
@@ -130,8 +130,8 @@ class KnowledgeGatewayProcessor(Processor):
             public_context=public_context
         )
         
-        evaluation_str = "" # Initialize evaluation_str
-        decision = False # Initialize decision
+        evaluation_str = "" 
+        decision = False 
 
         try:
             evaluation_str = await run_standalone_agent(gateway_agent, prompt)
@@ -143,12 +143,12 @@ class KnowledgeGatewayProcessor(Processor):
             if "true" in evaluation_str.lower() or "NEEDS_IMPROVEMENT" in evaluation_str:
                 decision = True
             else:
-                decision = False # Default to false on error
+                decision = False 
 
         logger.info(f"Knowledge evaluation result: {decision}")
         data["needs_improvement"] = decision
         return data
-
+        
 class CurationTriggerProcessor(Processor):
     """
     Triggers the curation pipeline if the knowledge needs improvement.
