@@ -6,6 +6,8 @@ on:
 
 jobs:
   call-gemini-review:
+    # Skip large PRs to avoid Gemini API free tier quota limits (250k TPM, 25 RPD)
+    if: github.event.pull_request.additions < 2000
     permissions:
       contents: read
       id-token: write
