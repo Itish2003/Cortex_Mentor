@@ -36,13 +36,13 @@ At its core, Cortex Mentor is built on a **Hybrid Knowledge Model**, combining a
 ## Usage
 
 ### 1. Install Dependencies
-This project uses Poetry for package management.
+This project uses [uv](https://docs.astral.sh/uv/) for fast dependency management.
 ```zsh
-# Install Poetry if you haven't already
-curl -sSL https://install.python-poetry.org | python3 -
+# Install uv if you haven't already
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install all dependencies (creates .venv automatically)
-poetry install
+uv sync --all-extras
 ```
 
 ### 2. Set Up Environment Variables
@@ -78,13 +78,13 @@ The backend consists of two main processes: the API server and the background wo
 **Terminal 3: Start the ARQ Worker**
 This process listens for and executes background jobs like processing events and synthesizing insights.
 ```zsh
-poetry run arq src.cortex.workers.WorkerSettings
+uv run arq src.cortex.workers.WorkerSettings
 ```
 
 **Terminal 4: Start the FastAPI Server**
 This process handles incoming API requests and manages the WebSocket connections for real-time delivery.
 ```zsh
-poetry run uvicorn src.cortex.main:app --reload
+uv run uvicorn src.cortex.main:app --reload
 ```
 
 ### 5. Run the Frontend
@@ -103,30 +103,30 @@ The backend uses `pytest` for testing with `pytest-asyncio` for async test suppo
 #### Running All Tests
 ```bash
 # Run all tests
-poetry run pytest
+uv run pytest
 
 # Run with verbose output
-poetry run pytest -v
+uv run pytest -v
 
 # Run with coverage report
-poetry run pytest --cov=src --cov-report=term-missing
+uv run pytest --cov=src --cov-report=term-missing
 ```
 
 #### Running Specific Test Categories
 ```bash
 # Run only unit tests (skip integration tests)
-poetry run pytest -m "not integration"
+uv run pytest -m "not integration"
 
 # Run only integration tests (mocked services)
-poetry run pytest tests/test_integration.py -v
+uv run pytest tests/test_integration.py -v
 
 # Run true E2E tests with real Redis (requires Redis running)
-poetry run pytest tests/test_e2e_real.py -v -m integration
+uv run pytest tests/test_e2e_real.py -v -m integration
 
 # Run tests for a specific module
-poetry run pytest tests/test_pipelines.py -v
-poetry run pytest tests/test_comprehension.py -v
-poetry run pytest tests/test_workers.py -v
+uv run pytest tests/test_pipelines.py -v
+uv run pytest tests/test_comprehension.py -v
+uv run pytest tests/test_workers.py -v
 ```
 
 #### Running True E2E Tests
@@ -138,11 +138,11 @@ The `test_e2e_real.py` file contains tests that interact with real external serv
 brew services start redis
 
 # Run E2E tests with real services
-poetry run pytest tests/test_e2e_real.py -v -m integration
+uv run pytest tests/test_e2e_real.py -v -m integration
 
 # Run specific E2E test class
-poetry run pytest tests/test_e2e_real.py::TestRealRedisConnection -v
-poetry run pytest tests/test_e2e_real.py::TestRealPipelineIntegration -v
+uv run pytest tests/test_e2e_real.py::TestRealRedisConnection -v
+uv run pytest tests/test_e2e_real.py::TestRealPipelineIntegration -v
 ```
 
 These tests verify:

@@ -24,45 +24,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.8.2
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+        run: uv python install 3.12
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync --all-extras
 
       - name: Verify Redis connection
         run: |
-          poetry run python -c "import redis; r = redis.Redis(); r.ping(); print('Redis connection successful')"
+          uv run python -c "import redis; r = redis.Redis(); r.ping(); print('Redis connection successful')"
 
       - name: Run integration tests
         run: |
-          poetry run pytest tests/test_integration.py -v -m integration --tb=short
+          uv run pytest tests/test_integration.py -v -m integration --tb=short
         env:
           REDIS_URL: redis://localhost:6379
 
       - name: Start backend server
         run: |
-          poetry run uvicorn src.cortex.main:app --host 0.0.0.0 --port 8000 &
+          uv run uvicorn src.cortex.main:app --host 0.0.0.0 --port 8000 &
           echo $! > server.pid
           sleep 5
 
@@ -79,7 +64,7 @@ jobs:
 
       - name: Start ARQ worker
         run: |
-          poetry run arq src.cortex.workers.WorkerSettings &
+          uv run arq src.cortex.workers.WorkerSettings &
           echo $! > worker.pid
           sleep 5
 
@@ -108,39 +93,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.8.2
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+        run: uv python install 3.12
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync --all-extras
 
       - name: Run API tests
         run: |
-          poetry run pytest tests/test_api.py -v
+          uv run pytest tests/test_api.py -v
 
       - name: Test API schema generation
         run: |
-          poetry run python -c "
+          uv run python -c "
           from cortex.main import app
           from fastapi.openapi.utils import get_openapi
           schema = get_openapi(
@@ -159,36 +129,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
       - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Poetry
-        uses: snok/install-poetry@v1
-        with:
-          version: 1.8.2
-          virtualenvs-create: true
-          virtualenvs-in-project: true
-
-      - name: Load cached venv
-        id: cached-poetry-dependencies
-        uses: actions/cache@v4
-        with:
-          path: .venv
-          key: venv-${{ runner.os }}-${{ hashFiles('**/poetry.lock') }}
+        run: uv python install 3.12
 
       - name: Install dependencies
-        if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
-
-      - name: Install project
-        run: poetry install --no-interaction
+        run: uv sync --all-extras
 
       - name: Run pipeline tests
         run: |
-          poetry run pytest tests/test_pipelines.py tests/test_comprehension.py tests/test_curation.py tests/test_delivery.py tests/test_graph_traversal.py -v
+          uv run pytest tests/test_pipelines.py tests/test_comprehension.py tests/test_curation.py tests/test_delivery.py tests/test_graph_traversal.py -v
 
       - name: Run worker tests
         run: |
-          poetry run pytest tests/test_workers.py -v
+          uv run pytest tests/test_workers.py -v
