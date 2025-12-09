@@ -112,7 +112,7 @@ class KnowledgeGatewayProcessor(Processor):
         
         # Sanitize the public knowledge before passing it to the prompt
         sanitized_results = [str(r).replace("/", " ").replace("\n", " ") for r in public_results]
-        public_context = "\n".join(sanitized_results)
+        public_context = "\n".join(sanitized_results) 
 
         # FIX: Instantiate the agent here for every request to ensure a fresh session
         gateway_agent = LlmAgent(
@@ -130,23 +130,25 @@ class KnowledgeGatewayProcessor(Processor):
             public_context=public_context
         )
         
-        # Use the local gateway_agent instance
-        evaluation_str = await run_standalone_agent(gateway_agent, prompt)
-        
+        evaluation_str = "" 
+        decision = False 
+
         try:
+            evaluation_str = await run_standalone_agent(gateway_agent, prompt)
             gateway_decision = GatewayDecision.model_validate_json(evaluation_str)
             decision = gateway_decision.needs_improvement
-        except Exception:
-            # Fallback for non-json response
+        except Exception as e:
+            logger.error(f"Error running LLM agent for KnowledgeGatewayProcessor: {e}", exc_info=True)
+            # Fallback for non-json response or agent errors
             if "true" in evaluation_str.lower() or "NEEDS_IMPROVEMENT" in evaluation_str:
                 decision = True
             else:
-                decision = False
+                decision = False 
 
         logger.info(f"Knowledge evaluation result: {decision}")
         data["needs_improvement"] = decision
         return data
-
+        
 class CurationTriggerProcessor(Processor):
     """
     Triggers the curation pipeline if the knowledge needs improvement.
