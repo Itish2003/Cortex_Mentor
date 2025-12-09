@@ -1,35 +1,66 @@
-[tool.poetry]
+[project]
 name = "cortex"
 version = "0.1.0"
 description = "Cortex Mentor Application"
-authors = ["Itish Srivastava <itish.github.io@gmail.com>"]
+authors = [{name = "Itish Srivastava", email = "itish.github.io@gmail.com"}]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi==0.119.0",
+    "uvicorn[standard]==0.37.0",
+    "pydantic==2.12.0",
+    "chromadb==0.5.4",
+    "ollama==0.6.0",
+    "watchdog==6.0.0",
+    "GitPython==3.1.43",
+    "arq>=0.26.0",
+    "redis>=5.0.4",
+    "upstash-vector>=0.8.0",
+    "PyYAML==6.0.3",
+    "google-adk==1.16.0",
+    "google-genai>=1.50.1",
+    "Jinja2>=3.1.6",
+    "google-cloud-texttospeech>=2.33.0",
+    "numpy<2.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.12"
-fastapi = "0.119.0"
-uvicorn = {version = "0.37.0", extras = ["standard"]}
-pydantic = "2.12.0"
-chromadb = "0.5.4"
-ollama = "0.6.0"
-watchdog = "6.0.0"
-GitPython = "3.1.43"
-arq = "^0.26.0"
-redis = "^5.0.4"
-upstash-vector = "^0.8.0"
-PyYAML = "6.0.3"
-google-adk = "1.16.0"
-google-genai = "^1.50.1"
-Jinja2 = "^3.1.6"
-google-cloud-texttospeech = "^2.33.0"
-numpy = "<2.0"
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.12.0",
+    "httpx>=0.28.1",
+    "ruff>=0.8.0",
+]
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.poetry.group.dev.dependencies]
-pytest = "^8.0.0"
-pytest-asyncio = "^0.23.0"
-pytest-cov = "^4.1.0"
-pytest-mock = "^3.12.0"
-httpx = "^0.28.1"
+[tool.hatch.build.targets.wheel]
+packages = ["src/cortex"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow",
+]
+addopts = "-v"
+
+[tool.coverage.run]
+omit = [
+    "*/.venv/*",
+    "tests/*",
+    "*/migrations/*",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
